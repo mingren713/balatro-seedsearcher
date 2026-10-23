@@ -150,6 +150,10 @@
   .or-row button{width:auto;margin:0;padding:3px 12px;font-size:14px;
     background:var(--green);box-shadow:0 4px 0 var(--green-dk)}
   .or-row button:active{box-shadow:0 0 0 var(--green-dk)}
+  .edition-needs{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:8px}
+  .edition-needs label{margin:0;text-align:center;color:var(--chip);font-size:14px}
+  .edition-needs input{margin-top:4px;padding:7px 4px;text-align:center}
+  @media(max-width:430px){.edition-needs{grid-template-columns:repeat(2,1fr)}}
 
   .face{
     display:flex;align-items:center;gap:7px;padding:4px 8px;
@@ -229,6 +233,16 @@
   <div class="cap">筛选条件<span class="i" data-tip="cond" style="background:var(--ink);color:var(--gold);margin-left:8px">i</span></div>
   <div id="wants"></div>
   <button class="ghost" id="add">+ 增加条件</button>
+
+  <div style="margin-top:16px;color:var(--chip);font-size:15px">
+    <div style="display:flex;align-items:center;gap:8px">这些条件合计至少包含<span class="i" data-tip="edtotal">i</span></div>
+    <div class="edition-needs">
+      <label>负片<input id="need-neg" type="number" min="0" value="0"></label>
+      <label>多彩<input id="need-poly" type="number" min="0" value="0"></label>
+      <label>全息<input id="need-holo" type="number" min="0" value="0"></label>
+      <label>闪箔<input id="need-foil" type="number" min="0" value="0"></label>
+    </div>
+  </div>
 
   <div class="row" style="margin-top:16px">
     <div>
@@ -597,28 +611,44 @@ function indexFromSeed(str){
   for(let i=0;i<8;i++){const p=CHARS.indexOf(s[i]);n=n*35+(p<0?0:p);}
   return n;
 }
-function matchSeed(seed,groups,slots,maxAnte,withPacks){
+function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds){
   const got=scanSeed(seed,maxAnte,slots,withPacks);
-  const out=[];
+  const out=new Array(groups.length);
   const used=new Set();
-  for(const grp of groups){
-    let found=null;
-    for(const w of grp){
-      const g=got.find(x=>x.name===w.name&&x.ante<=w.ante&&(!w.ed||x.edition===w.ed)&&!used.has(x));
-      if(g){found=g;break;}
+  const needed=editionNeeds||{};
+  const counts={};
+  const needKeys=Object.keys(needed).filter(k=>needed[k]>0);
+  const search=i=>{
+    if(i===groups.length)
+      return needKeys.every(k=>(counts[k]||0)>=needed[k]);
+    const deficit=needKeys.reduce((n,k)=>n+Math.max(0,needed[k]-(counts[k]||0)),0);
+    if(deficit>groups.length-i)return false;
+    const candidates=[];const seen=new Set();
+    for(const w of groups[i]) for(let gi=0;gi<got.length;gi++){
+      const g=got[gi];
+      if(!seen.has(gi)&&!used.has(gi)&&g.name===w.name&&g.ante<=w.ante&&(!w.ed||g.edition===w.ed)){
+        seen.add(gi);candidates.push([gi,g]);
+      }
     }
-    if(!found)return null;
-    used.add(found);
-    out.push(found);
-  }
-  return out;
+    candidates.sort((a,b)=>Math.max(0,(needed[b[1].edition]||0)-(counts[b[1].edition]||0))-
+      Math.max(0,(needed[a[1].edition]||0)-(counts[a[1].edition]||0)));
+    for(const [gi,g] of candidates){
+      used.add(gi);out[i]=g;
+      if(g.edition)counts[g.edition]=(counts[g.edition]||0)+1;
+      if(search(i+1))return true;
+      if(g.edition)counts[g.edition]--;
+      used.delete(gi);
+    }
+    return false;
+  };
+  return search(0)?out:null;
 }
 
 /* ===== 快速通道：只算条件用得上的东西，用来快速排除 ===== */
 const RAR_OF={};
 for(const r of [1,2,3,4]) for(const j of POOLS[r]) RAR_OF[j]=r;
 
-function makePlan(groups,slots,maxAnte,withPacks){
+function makePlan(groups,slots,maxAnte,withPacks,editionNeeds){
   const needRar=new Set();
   let needLeg=false;
   const allWants=[];
@@ -639,7 +669,7 @@ function makePlan(groups,slots,maxAnte,withPacks){
     if(g.every(w=>RAR_OF[w.name]===4))legGroups.push(i);
     for(const w of g) if(RAR_OF[w.name]===4) legMax=Math.max(legMax,w.ante);
   });
-  return {needRar,needLeg,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks};
+  return {needRar,needLeg,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks,editionNeeds};
 }
 
 /* 每个底注用到的 key 编号，第一次用到时登记 */
@@ -746,7 +776,7 @@ function fastScan(seed,plan){
 /* 对外：先快速排除，看着有戏再用完整版确认 */
 function matchFast(seed,plan){
   if(!fastScan(seed,plan))return null;
-  return matchSeed(seed,plan.groups,plan.slots,plan.maxAnte,plan.withPacks);
+  return matchSeed(seed,plan.groups,plan.slots,plan.maxAnte,plan.withPacks,plan.editionNeeds);
 }
 </script>
 
@@ -1055,28 +1085,44 @@ function indexFromSeed(str){
   for(let i=0;i<8;i++){const p=CHARS.indexOf(s[i]);n=n*35+(p<0?0:p);}
   return n;
 }
-function matchSeed(seed,groups,slots,maxAnte,withPacks){
+function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds){
   const got=scanSeed(seed,maxAnte,slots,withPacks);
-  const out=[];
+  const out=new Array(groups.length);
   const used=new Set();
-  for(const grp of groups){
-    let found=null;
-    for(const w of grp){
-      const g=got.find(x=>x.name===w.name&&x.ante<=w.ante&&(!w.ed||x.edition===w.ed)&&!used.has(x));
-      if(g){found=g;break;}
+  const needed=editionNeeds||{};
+  const counts={};
+  const needKeys=Object.keys(needed).filter(k=>needed[k]>0);
+  const search=i=>{
+    if(i===groups.length)
+      return needKeys.every(k=>(counts[k]||0)>=needed[k]);
+    const deficit=needKeys.reduce((n,k)=>n+Math.max(0,needed[k]-(counts[k]||0)),0);
+    if(deficit>groups.length-i)return false;
+    const candidates=[];const seen=new Set();
+    for(const w of groups[i]) for(let gi=0;gi<got.length;gi++){
+      const g=got[gi];
+      if(!seen.has(gi)&&!used.has(gi)&&g.name===w.name&&g.ante<=w.ante&&(!w.ed||g.edition===w.ed)){
+        seen.add(gi);candidates.push([gi,g]);
+      }
     }
-    if(!found)return null;
-    used.add(found);
-    out.push(found);
-  }
-  return out;
+    candidates.sort((a,b)=>Math.max(0,(needed[b[1].edition]||0)-(counts[b[1].edition]||0))-
+      Math.max(0,(needed[a[1].edition]||0)-(counts[a[1].edition]||0)));
+    for(const [gi,g] of candidates){
+      used.add(gi);out[i]=g;
+      if(g.edition)counts[g.edition]=(counts[g.edition]||0)+1;
+      if(search(i+1))return true;
+      if(g.edition)counts[g.edition]--;
+      used.delete(gi);
+    }
+    return false;
+  };
+  return search(0)?out:null;
 }
 
 /* ===== 快速通道：只算条件用得上的东西，用来快速排除 ===== */
 const RAR_OF={};
 for(const r of [1,2,3,4]) for(const j of POOLS[r]) RAR_OF[j]=r;
 
-function makePlan(groups,slots,maxAnte,withPacks){
+function makePlan(groups,slots,maxAnte,withPacks,editionNeeds){
   const needRar=new Set();
   let needLeg=false;
   const allWants=[];
@@ -1097,7 +1143,7 @@ function makePlan(groups,slots,maxAnte,withPacks){
     if(g.every(w=>RAR_OF[w.name]===4))legGroups.push(i);
     for(const w of g) if(RAR_OF[w.name]===4) legMax=Math.max(legMax,w.ante);
   });
-  return {needRar,needLeg,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks};
+  return {needRar,needLeg,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks,editionNeeds};
 }
 
 /* 每个底注用到的 key 编号，第一次用到时登记 */
@@ -1204,7 +1250,7 @@ function fastScan(seed,plan){
 /* 对外：先快速排除，看着有戏再用完整版确认 */
 function matchFast(seed,plan){
   if(!fastScan(seed,plan))return null;
-  return matchSeed(seed,plan.groups,plan.slots,plan.maxAnte,plan.withPacks);
+  return matchSeed(seed,plan.groups,plan.slots,plan.maxAnte,plan.withPacks,plan.editionNeeds);
 }
 
 const CN={"Joker": "小丑", "Greedy Joker": "贪婪小丑", "Lusty Joker": "色欲小丑", "Wrathful Joker": "愤怒小丑", "Gluttonous Joker": "暴食小丑", "Jolly Joker": "开心小丑", "Zany Joker": "古怪小丑", "Mad Joker": "疯狂小丑", "Crazy Joker": "狂野小丑", "Droll Joker": "滑稽小丑", "Sly Joker": "奸诈小丑", "Wily Joker": "狡猾小丑", "Clever Joker": "聪敏小丑", "Devious Joker": "阴险小丑", "Crafty Joker": "精明小丑", "Half Joker": "半张小丑", "Credit Card": "信用卡", "Banner": "旗帜", "Mystic Summit": "神秘之峰", " 8 Ball": "八号球", "Misprint": "印错", "Raised Fist": "致胜之拳", "Chaos the Clown": "混沌小丑", "Scary Face": "恐怖面孔", "Abstract Joker": "抽象小丑", "Delayed Gratification": "延迟满足", "Gros Michel": "大麦克香蕉", "Even Steven": "偶数史蒂文", "Odd Todd": "奇数托德", "Scholar": "学者", "Business Card": "名片", "Supernova": "超新星", "Ride the Bus": "搭乘巴士", "Egg": "蛋", "Runner": "跑步选手", "Ice Cream": "冰淇淋", "Splash": "飞溅", "Blue Joker": "蓝色小丑", "Faceless Joker": "无面小丑", "Green Joker": "绿色小丑", "Superposition": "叠加态", "To Do List": "待办清单", "Cavendish": "卡文迪什", "Red Card": "红牌", "Square Joker": "方块小丑", "Riff raff": "乌合之众", "Photograph": "照片", "Reserved Parking": "私人车位", "Mail In Rebate": "邮件回扣", "Hallucination": "幻觉", "Fortune Teller": "占卜师", "Juggler": "杂耍师", "Drunkard": "醉汉", "Golden Joker": "黄金小丑", "Popcorn": "爆米花", "Walkie Talkie": "对讲机", "Smiley Face": "笑脸", "Golden Ticket": "金票", "Swashbuckler": "侠盗", "Hanging Chad": "未断选票", "Shoot the Moon": "射月", "Joker Stencil": "小丑模板", "Four Fingers": "四指", "Mime": "哑剧演员", "Ceremonial Dagger": "仪式匕首", "Marble Joker": "大理石小丑", "Loyalty Card": "会员卡", "Dusk": "黄昏", "Fibonacci": "斐波那契", "Steel Joker": "钢铁小丑", "Hack": "烂脱口秀演员", "Pareidolia": "幻视", "Space Joker": "太空小丑", "Burglar": "窃贼", "Blackboard": "黑板", "Sixth Sense": "第六感", "Constellation": "星座", "Hiker": "徒步者", "Card Sharp": "老千小丑", "Madness": "疯狂", "Seance": "通灵", "Vampire": "吸血鬼", "Shortcut": "捷径", "Hologram": "全息影像", "Cloud 9": "九霄云外", "Rocket": "火箭", "Midas Mask": "迈达斯面具", "Luchador": "摔角手", "Gift Card": "礼品卡", "Turtle Bean": "龟豆", "Erosion": "侵蚀", "To the Moon": "飞向月球", "Stone Joker": "石头小丑", "Lucky Cat": "幸运猫", "Bull": "公牛", "Diet Cola": "无糖可乐", "Trading Card": "交易卡", "Flash Card": "抽认卡", "Spare Trousers": "备用长裤", "Ramen": "拉面", "Seltzer": "苏打水", "Castle": "城堡", "Mr Bones": "骷髅先生", "Acrobat": "杂技演员", "Sock and Buskin": "悲与喜", "Troubadour": "吟游诗人", "Certificate": "证书", "Smeared Joker": "涂抹小丑", "Throwback": "复古", "Rough Gem": "原石", "Bloodstone": "血石", "Arrowhead": "箭头", "Onyx Agate": "缟玛瑙", "Glass Joker": "玻璃小丑", "Showman": "马戏团长", "Flower Pot": "花盆", "Merry Andy": "快乐安迪", "Oops All 6s": "六六大顺", "The Idol": "偶像", "Seeing Double": "重影", "Matador": "斗牛士", "Satellite": "卫星", "Cartomancer": "纸牌占卜师", "Astronomer": "天文学家", "Bootstraps": "提靴带", "DNA": "DNA", "Vagabond": "流浪汉", "Baron": "男爵", "Obelisk": "方尖碑", "Baseball Card": "棒球卡", "Ancient Joker": "古代小丑", "Campfire": "营火", "Blueprint": "蓝图", "Wee Joker": "小小丑", "Hit the Road": "上路吧杰克", "The Duo": "二重奏", "The Trio": "三重奏", "The Family": "一家人", "The Order": "秩序", "The Tribe": "部落", "Stuntman": "特技演员", "Invisible Joker": "隐形小丑", "Brainstorm": "头脑风暴", "Drivers License": "驾驶执照", "Burnt Joker": "烧焦小丑", "Canio": "卡尼奥", "Triboulet": "特里布莱", "Yorick": "约里克", "Chicot": "希科", "Perkeo": "帕奇欧"};
@@ -1321,7 +1367,7 @@ const WORKER_SRC = document.getElementById('engine-src').textContent + `
 onmessage = function(e){
   var d=e.data, hits=[];
   setUnlocks(d.unlocks);
-  var plan=makePlan(d.groups,d.slots,d.maxAnte,d.withPacks);
+  var plan=makePlan(d.groups,d.slots,d.maxAnte,d.withPacks,d.editionNeeds);
   for(var i=0;i<d.count;i++){
     var seed=seedFromIndex(d.start+i);
     var m=matchFast(seed,plan);
@@ -1351,6 +1397,12 @@ $("go").onclick=()=>{
     }))
   ).filter(g=>g.length);
   if(!groups.length)return;
+  const editionNeeds=readEditionNeeds();
+  const editionNeedTotal=Object.values(editionNeeds).reduce((a,b)=>a+b,0);
+  if(editionNeedTotal>groups.length){
+    $("stat").textContent="组合版本数量不能超过条件数量（每张小丑最多只有一个版本）。";
+    return;
+  }
   const slots=parseInt($("slots").value,10)||6;
   const target=Math.max(1,parseInt($("found").value,10)||5);
   const maxAnte=Math.max(...groups.flat().map(w=>w.ante));
@@ -1395,7 +1447,7 @@ $("go").onclick=()=>{
         if(!running||hits>=target){ if(pool.every(x=>x.idle))finish(); return; }
         w.idle=false;
         const start=cursor;cursor+=CHUNK;
-        w.postMessage({start,count:CHUNK,groups,slots,maxAnte,withPacks,unlocks:readUnlocks()});
+        w.postMessage({start,count:CHUNK,groups,slots,maxAnte,withPacks,editionNeeds,unlocks:readUnlocks()});
       };
       w.onmessage=ev=>{
         tried+=ev.data.tried;
@@ -1410,7 +1462,7 @@ $("go").onclick=()=>{
     (async()=>{
       $("stat").textContent="这个浏览器不让开多线程，用单核跑…";
       while(running&&hits<target){
-        const plan=makePlan(groups,slots,maxAnte,withPacks);
+        const plan=makePlan(groups,slots,maxAnte,withPacks,editionNeeds);
         for(let n=0;n<3000&&running&&hits<target;n++){
           const seed=seedFromIndex(cursor++);tried++;
           const m=matchFast(seed,plan);
@@ -1438,7 +1490,8 @@ const TIPS={
   gold:"有几张小丑开局是锁着的，抽到了会被换掉：<br>金票要牌组里有黄金牌，钢铁小丑要钢铁牌，石头小丑要石头牌，幸运猫要幸运牌，玻璃小丑要玻璃牌，卡文迪什要大麦克香蕉灭绝过。<br><br>打对应流派时勾上，它们才搜得到。勾了“大麦克灭绝”以后，大麦克香蕉本身就不会再出现了。<br><br>注意：勾上后是从底注 1 第一个位置起就算已经满足，太早出现的那几张实战里可能还拿不到。",
   packs:"勾上以后，卡包里开出的小丑也算数。<br><br><b>搜传奇必须勾着</b>，因为灵魂牌只出现在奇术包和幻灵包里。",
   from:"种子是按顺序一个个试过去的。<br><br>留空就随机挑个起点开始数；填一个种子则从它往后接着数。"+
-       "上次搜到一半关掉了，把下面显示的“数到这里了”填进来就能续上。"
+       "上次搜到一半关掉了，把下面显示的“数到这里了”填进来就能续上。",
+  edtotal:"这里限制的是所有独立条件最终命中的小丑合计版本，不绑定到具体名字。<br><br>例如添加蓝图、头脑风暴、男爵三个条件，把多彩填 1、负片填 1，就表示三张都要出现，而且其中任意一张是多彩、任意另一张是负片。<br><br>每张小丑最多只有一个版本，所以四项数量之和不能超过独立条件数量。"
 };
 function showTip(k){
   if(!TIPS[k])return;
@@ -1512,6 +1565,19 @@ function readGroups(){
     }))
   ).filter(g=>g.length);
 }
+function readEditionNeeds(){
+  const fields={"负片":"need-neg","多彩":"need-poly","全息":"need-holo","闪箔":"need-foil"};
+  const out={};
+  for(const [edition,id] of Object.entries(fields)){
+    const n=Math.max(0,parseInt($(id).value,10)||0);
+    if(n)out[edition]=n;
+  }
+  return out;
+}
+function describeEditionNeeds(needs){
+  const parts=Object.entries(needs||{}).filter(([,n])=>n>0).map(([ed,n])=>ed+"至少 "+n+" 张");
+  return parts.length?"；组合版本："+parts.join("、"):"";
+}
 function fmtTime(s){
   if(s<1)return "不到 1 秒";
   if(s<60)return Math.round(s)+" 秒";
@@ -1571,7 +1637,37 @@ function sameGroup(a,b){
   const key=g=>g.map(w=>w.name+"|"+w.ed+"|"+w.ante).sort().join(",");
   return key(a)===key(b);
 }
-function estimate(groups,slots,withPacks){
+function editionNeedProbability(groups,slots,withPacks,needs){
+  const keys=Object.keys(needs||{}).filter(k=>needs[k]>0);
+  if(!keys.length)return 1;
+  const editionP={"":0.96,"负片":0.003,"多彩":0.003,"全息":0.014,"闪箔":0.02};
+  let states=new Map([[keys.map(()=>0).join(","),1]]);
+  for(const grp of groups){
+    const mix={"":0,"负片":0,"多彩":0,"全息":0,"闪箔":0};
+    for(const w of grp){
+      let base=0;
+      const plain={name:w.name,ed:"",ante:w.ante};
+      for(let a=1;a<=w.ante;a++)base+=lambdaPerAnte(plain,a,slots,withPacks);
+      if(w.ed)mix[w.ed]+=base*(ED_P[w.ed]||0);
+      else for(const [ed,p] of Object.entries(editionP))mix[ed]+=base*p;
+    }
+    const total=Object.values(mix).reduce((a,b)=>a+b,0);
+    if(total<=0)return 0;
+    const next=new Map();
+    for(const [state,p0] of states){
+      const counts=state.split(",").map(Number);
+      for(const [ed,weight] of Object.entries(mix)){
+        if(weight<=0)continue;
+        const nc=counts.slice();const k=keys.indexOf(ed);
+        if(k>=0)nc[k]=Math.min(needs[ed],nc[k]+1);
+        const id=nc.join(",");next.set(id,(next.get(id)||0)+p0*weight/total);
+      }
+    }
+    states=next;
+  }
+  return states.get(keys.map(k=>needs[k]).join(","))||0;
+}
+function estimate(groups,slots,withPacks,editionNeeds){
   /* 把完全相同的组合并，用泊松算"至少 k 个" */
   const buckets=[];
   for(const g of groups){
@@ -1587,19 +1683,25 @@ function estimate(groups,slots,withPacks){
     for(let j=0;j<b.k;j++){ tail-=term; term=term*lam/(j+1); }
     p *= Math.max(tail,0);
   }
-  return p;
+  return p*editionNeedProbability(groups,slots,withPacks,editionNeeds);
 }
 
 $("est").onclick=()=>{
   const groups=readGroups();
   if(!groups.length)return;
+  const editionNeeds=readEditionNeeds();
+  if(Object.values(editionNeeds).reduce((a,b)=>a+b,0)>groups.length){
+    $("odds").style.display="block";
+    $("odds").innerHTML='<span class="lv lv-hard">搜不到</span>组合版本数量不能超过条件数量。';
+    return;
+  }
   const slots=parseInt($("slots").value,10)||0;
   const withPacks=$("packs").checked;
   setUnlocks(readUnlocks());
   const box=$("odds");
   box.style.display="block";
 
-  const p=estimate(groups,slots,withPacks);
+  const p=estimate(groups,slots,withPacks,editionNeeds);
   const cores=Math.min(navigator.hardwareConcurrency||4,8);
   const speed=14000*cores*0.85;   /* 每核大概 1.4 万/秒 */
 
@@ -1618,7 +1720,7 @@ $("est").onclick=()=>{
   txt="大约每 <span class=\"big\">"+one.toLocaleString()+"</span> 个种子出一个<br>";
   if(sec>1800)txt+='<br><span style="color:var(--dim)">太久的话，可以放宽条件，或用「+ 或者」多加几张备选。</span>';
 
-  box.innerHTML='<span class="lv '+lv+'">'+lvName+'</span>'+describeGroups(groups)+
+  box.innerHTML='<span class="lv '+lv+'">'+lvName+'</span>'+describeGroups(groups)+describeEditionNeeds(editionNeeds)+
     '<div style="margin-top:8px">'+txt+'</div>'+
     '<div style="margin-top:6px;color:var(--dim);font-size:13px">粗略估算，实际用时一般远小于估计</div>';
 };
