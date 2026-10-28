@@ -8,7 +8,20 @@ const executableScripts = [...html.matchAll(/<script(?![^>]*text\/plain)[^>]*>([
 for (const [, source] of executableScripts) new Function(source);
 new Function(engineMatch[1]);
 
+if (!html.includes('✦ 灵魂牌 → '))
+  throw new Error("seed analysis should label Soul cards explicitly");
+if (!html.includes("前 4 底注的已分析卡包中没有发现灵魂牌"))
+  throw new Error("seed analysis should report when no Soul card is found");
+
 const tests = `
+  const soulRun = {
+    rand(key){ return key === "soul_Tarot1" ? 0.999 : 0.5; },
+    choice(key,pool){ return pool[0]; }
+  };
+  const soulPack = openPack(soulRun,"Arcana Pack",1);
+  if (soulPack.filter(card=>card.soul).length !== 1)
+    throw new Error("Arcana pack should expose exactly one Soul card when the Soul roll succeeds");
+
   const sample = [
     {name:"Blueprint",ante:1,edition:"",from:"shop"},
     {name:"Blueprint",ante:2,edition:"负片",from:"shop"},
@@ -37,4 +50,4 @@ const tests = `
 `;
 
 new Function(engineMatch[1] + tests)();
-console.log("OK: page scripts compile and aggregate edition matching passes");
+console.log("OK: page scripts compile; Soul analysis and aggregate edition matching pass");

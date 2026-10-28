@@ -197,6 +197,10 @@
   .preview{font-size:15px;line-height:1.95}
   .preview .a{color:var(--gold)}
   .preview .o{color:var(--dim)}
+  .seed-hint{margin-top:8px;color:var(--dim);font-size:13px;line-height:1.55}
+  .soul-summary{margin-bottom:10px;padding:9px 11px;border:1px solid var(--gold);border-radius:8px;background:rgba(240,190,66,.08)}
+  .soul-summary.none{border-color:var(--line);background:transparent;color:var(--dim)}
+  .soul-card{color:var(--gold);font-weight:700}
 
   /* ---- 陈列柜 ---- */
   #picker{display:none;position:fixed;inset:0;z-index:99;
@@ -289,6 +293,7 @@
   <div class="cap">简易种子分析</div>
   <input id="one" placeholder="输入种子" autocapitalize="characters" spellcheck="false">
   <button class="ghost" id="peek" style="margin-top:12px">查询种子详情</button>
+  <div class="seed-hint">灵魂牌属于幻灵牌，但会出现在奇术包和幻灵包中；下方会标出它生成的传奇小丑。</div>
   <div class="preview" id="pv" style="margin-top:12px"></div>
 </div></fieldset>
 
@@ -1744,7 +1749,7 @@ $("peek").onclick=()=>{
   if(!seed)return;
   setUnlocks(readUnlocks());
   const run=new Run(seed);const _st={};
-  let html="";
+  let html="";const souls=[];
   for(let a=1;a<=4;a++){
     const items=[];
     for(let s=1;s<=8;s++){
@@ -1756,14 +1761,24 @@ $("peek").onclick=()=>{
     }
     html+='<div><span class="a">底注 '+a+"</span>　"+items.join("　")+"</div>";
     for(const p of antePacks(run,a,_st)){
-      const cs=p.cards.map(c=>c.type==="joker"
-        ? jname(c.name)+(c.soul?"✦":"")+(c.edition?"・"+c.edition:"")
-        : (c.name||"?")).join("、");
+      const cs=p.cards.map(c=>{
+        if(c.type!=="joker")return c.name||"?";
+        if(c.soul){
+          souls.push({ante:a,pack:packName(p.pack),joker:jname(c.name),edition:c.edition});
+          return '<span class="soul-card">✦ 灵魂牌 → '+jname(c.name)+
+            (c.edition?"・"+c.edition:"")+"</span>";
+        }
+        return jname(c.name)+(c.edition?"・"+c.edition:"");
+      }).join("、");
       html+='<div style="padding-left:14px"><span class="o">'+packName(p.pack)+
             "（"+packInfo(p.pack).size+" 选 "+packInfo(p.pack).pick+"）：</span>"+cs+"</div>";
     }
   }
-  $("pv").innerHTML=html;
+  const soulSummary=souls.length
+    ? '<div class="soul-summary"><b>前 4 底注发现 '+souls.length+' 张灵魂牌：</b><br>'+souls.map(s=>
+        "底注 "+s.ante+"・"+s.pack+" → "+s.joker+(s.edition?"・"+s.edition:"")).join("<br>")+"</div>"
+    : '<div class="soul-summary none">前 4 底注的已分析卡包中没有发现灵魂牌。</div>';
+  $("pv").innerHTML=soulSummary+html;
 };
 </script>
 <script data-goatcounter="https://sillyfish.goatcounter.com/count"
