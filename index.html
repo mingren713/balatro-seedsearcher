@@ -202,6 +202,7 @@
   .preview{font-size:15px;line-height:1.95}
   .preview .a{color:var(--gold)}
   .preview .o{color:var(--dim)}
+  .preview .tag{color:var(--green);font-weight:700}
   .seed-hint{margin-top:8px;color:var(--dim);font-size:13px;line-height:1.55}
   .soul-summary{margin-bottom:10px;padding:9px 11px;border:1px solid var(--gold);border-radius:8px;background:rgba(240,190,66,.08)}
   .soul-summary.none{border-color:var(--line);background:transparent;color:var(--dim)}
@@ -303,9 +304,12 @@
 
 <fieldset><div class="fs-in">
   <div class="cap">简易种子分析</div>
-  <input id="one" placeholder="输入种子" autocapitalize="characters" spellcheck="false">
+  <div class="row">
+    <div style="flex:2"><label>种子</label><input id="one" placeholder="输入种子" autocapitalize="characters" spellcheck="false"></div>
+    <div><label>分析到底注</label><input id="peek-antes" type="number" min="1" max="20" value="8"></div>
+  </div>
   <button class="ghost" id="peek" style="margin-top:12px">查询种子详情</button>
-  <div class="seed-hint">灵魂牌属于幻灵牌，但会出现在奇术包和幻灵包中；下方会标出它生成的传奇小丑。</div>
+  <div class="seed-hint">会显示每个底注的小盲/大盲跳过标签。标签按稀有小丑与四种版本均已发现计算；灵魂牌会标出它生成的传奇小丑。</div>
   <div class="preview" id="pv" style="margin-top:12px"></div>
 </div></fieldset>
 
@@ -493,6 +497,24 @@ function setUnlocks(u){
 }
 /* 行星X/谷神星/阋神星 要先打出过对应牌型 */
 const GATED_PLANETS=new Set(["Planet X","Ceres","Eris"]);
+
+/* 跳过盲注标签：池子按游戏里的 order 排序。前置收藏默认均已发现。 */
+const TAG_KEYS=["tag_uncommon","tag_rare","tag_negative","tag_foil","tag_holo","tag_polychrome",
+  "tag_investment","tag_voucher","tag_boss","tag_standard","tag_charm","tag_meteor","tag_buffoon",
+  "tag_handy","tag_garbage","tag_ethereal","tag_coupon","tag_double","tag_juggle","tag_d_six",
+  "tag_top_up","tag_skip","tag_orbital","tag_economy"];
+const TAG_MIN_ANTE_2=new Set(["tag_negative","tag_standard","tag_meteor","tag_buffoon","tag_handy",
+  "tag_garbage","tag_ethereal","tag_top_up","tag_orbital"]);
+const TAG_CN={tag_uncommon:"罕见标签",tag_rare:"稀有标签",tag_negative:"负片标签",tag_foil:"闪箔标签",
+  tag_holo:"镭射标签",tag_polychrome:"多彩标签",tag_investment:"投资标签",tag_voucher:"优惠券标签",
+  tag_boss:"Boss标签",tag_standard:"标准标签",tag_charm:"吊饰标签",tag_meteor:"流星标签",
+  tag_buffoon:"小丑标签",tag_handy:"顺手标签",tag_garbage:"垃圾标签",tag_ethereal:"空灵标签",
+  tag_coupon:"代金券标签",tag_double:"双倍标签",tag_juggle:"杂耍标签",tag_d_six:"D6标签",
+  tag_top_up:"充值标签",tag_skip:"速度标签",tag_orbital:"轨道标签",tag_economy:"经济标签"};
+function nextTag(run,ante){
+  return run.choice("Tag"+ante,TAG_KEYS,ante<2?TAG_MIN_ANTE_2:null);
+}
+function anteTags(run,ante){return {small:nextTag(run,ante),big:nextTag(run,ante)};}
 
 /* 商店第 n 个位置卖什么 */
 function shopSlot(run,ante,stickerMode){
@@ -983,6 +1005,24 @@ function setUnlocks(u){
 }
 /* 行星X/谷神星/阋神星 要先打出过对应牌型 */
 const GATED_PLANETS=new Set(["Planet X","Ceres","Eris"]);
+
+/* 跳过盲注标签：池子按游戏里的 order 排序。前置收藏默认均已发现。 */
+const TAG_KEYS=["tag_uncommon","tag_rare","tag_negative","tag_foil","tag_holo","tag_polychrome",
+  "tag_investment","tag_voucher","tag_boss","tag_standard","tag_charm","tag_meteor","tag_buffoon",
+  "tag_handy","tag_garbage","tag_ethereal","tag_coupon","tag_double","tag_juggle","tag_d_six",
+  "tag_top_up","tag_skip","tag_orbital","tag_economy"];
+const TAG_MIN_ANTE_2=new Set(["tag_negative","tag_standard","tag_meteor","tag_buffoon","tag_handy",
+  "tag_garbage","tag_ethereal","tag_top_up","tag_orbital"]);
+const TAG_CN={tag_uncommon:"罕见标签",tag_rare:"稀有标签",tag_negative:"负片标签",tag_foil:"闪箔标签",
+  tag_holo:"镭射标签",tag_polychrome:"多彩标签",tag_investment:"投资标签",tag_voucher:"优惠券标签",
+  tag_boss:"Boss标签",tag_standard:"标准标签",tag_charm:"吊饰标签",tag_meteor:"流星标签",
+  tag_buffoon:"小丑标签",tag_handy:"顺手标签",tag_garbage:"垃圾标签",tag_ethereal:"空灵标签",
+  tag_coupon:"代金券标签",tag_double:"双倍标签",tag_juggle:"杂耍标签",tag_d_six:"D6标签",
+  tag_top_up:"充值标签",tag_skip:"速度标签",tag_orbital:"轨道标签",tag_economy:"经济标签"};
+function nextTag(run,ante){
+  return run.choice("Tag"+ante,TAG_KEYS,ante<2?TAG_MIN_ANTE_2:null);
+}
+function anteTags(run,ante){return {small:nextTag(run,ante),big:nextTag(run,ante)};}
 
 /* 商店第 n 个位置卖什么 */
 function shopSlot(run,ante,stickerMode){
@@ -1827,9 +1867,11 @@ $("peek").onclick=()=>{
   if(!seed)return;
   setUnlocks(readUnlocks());
   const stickerMode=$("sticker-mode").value;
+  const peekAntes=Math.min(20,Math.max(1,parseInt($("peek-antes").value,10)||8));
   const run=new Run(seed);const _st={};
   let html="";const souls=[];
-  for(let a=1;a<=4;a++){
+  for(let a=1;a<=peekAntes;a++){
+    const tags=anteTags(run,a);
     const items=[];
     for(let s=1;s<=8;s++){
       const it=shopSlot(run,a,stickerMode);
@@ -1839,7 +1881,9 @@ $("peek").onclick=()=>{
           (it.soul?"・灵魂":"")+")</span>"
         : '<span class="o">'+it.type+"</span>");
     }
-    html+='<div><span class="a">底注 '+a+"</span>　"+items.join("　")+"</div>";
+    html+='<div><span class="a">底注 '+a+'</span>　小盲跳过：<span class="tag">'+TAG_CN[tags.small]+
+      '</span>　大盲跳过：<span class="tag">'+TAG_CN[tags.big]+"</span></div>";
+    html+='<div style="padding-left:14px"><span class="o">商店：</span>'+items.join("　")+"</div>";
     for(const p of antePacks(run,a,_st,stickerMode)){
       const cs=p.cards.map(c=>{
         if(c.type!=="joker")return c.name||"?";
@@ -1855,9 +1899,9 @@ $("peek").onclick=()=>{
     }
   }
   const soulSummary=souls.length
-    ? '<div class="soul-summary"><b>前 4 底注发现 '+souls.length+' 张灵魂牌：</b><br>'+souls.map(s=>
+    ? '<div class="soul-summary"><b>前 '+peekAntes+' 底注发现 '+souls.length+' 张灵魂牌：</b><br>'+souls.map(s=>
         "底注 "+s.ante+"・"+s.pack+" → "+s.joker+(s.edition?"・"+s.edition:"")).join("<br>")+"</div>"
-    : '<div class="soul-summary none">前 4 底注的已分析卡包中没有发现灵魂牌。</div>';
+    : '<div class="soul-summary none">前 '+peekAntes+' 底注的已分析卡包中没有发现灵魂牌。</div>';
   $("pv").innerHTML=soulSummary+html;
 };
 </script>

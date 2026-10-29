@@ -17,7 +17,7 @@ if (engineStart < 0 || engineEnd < 0 ||
 
 if (!html.includes('✦ 灵魂牌 → '))
   throw new Error("seed analysis should label Soul cards explicitly");
-if (!html.includes("前 4 底注的已分析卡包中没有发现灵魂牌"))
+if (!html.includes("底注的已分析卡包中没有发现灵魂牌"))
   throw new Error("seed analysis should report when no Soul card is found");
 if (!html.includes('class="seed" data-seed="'))
   throw new Error("seed results should preserve the original seed while showing copy feedback");
@@ -25,8 +25,24 @@ if ((html.match(/const sd=e\.target\.closest\("\.seed"\)/g) || []).length !== 1)
   throw new Error("seed results should have exactly one click-to-copy handler");
 if (!html.includes('id="sticker-mode"') || !html.includes('class="sticker"'))
   throw new Error("sticker rule and per-Joker sticker controls should be present");
+if (!html.includes('id="peek-antes"') || !html.includes("小盲跳过"))
+  throw new Error("seed analysis should expose per-ante skip tags");
 
 const tests = `
+  const tagCalls = [];
+  const tagMock = {choice(key,pool,locked){tagCalls.push({key,pool,locked});return pool[0];}};
+  const firstTags = anteTags(tagMock,1);
+  if (firstTags.small !== "tag_uncommon" || firstTags.big !== "tag_uncommon")
+    throw new Error("ante tags should generate Small and Big blind rewards");
+  if (tagCalls.length !== 2 || tagCalls.some(call=>call.key!=="Tag1"))
+    throw new Error("both blind tags should advance the Tag+ante RNG stream");
+  if (!tagCalls[0].locked.has("tag_negative"))
+    throw new Error("ante-one-only tag restrictions should be preserved");
+  const liveTags = anteTags(new Run("AAAAAAAA"),1);
+  if (!TAG_KEYS.includes(liveTags.small) || !TAG_KEYS.includes(liveTags.big) ||
+      TAG_MIN_ANTE_2.has(liveTags.small) || TAG_MIN_ANTE_2.has(liveTags.big))
+    throw new Error("ante one should only return eligible tags");
+
   const stickerKeys = [];
   const stickerRun = {rand(key){ stickerKeys.push(key); return 0.8; }};
   if (jokerSticker(stickerRun,"sho",1,"eternal","Blueprint") !== "永恒")
@@ -97,4 +113,4 @@ const tests = `
 `;
 
 new Function(engineMatch[1] + tests)();
-console.log("OK: page scripts compile; Soul, sticker, and aggregate edition matching pass");
+console.log("OK: page scripts compile; skip tags, Soul, stickers, and aggregate edition matching pass");
