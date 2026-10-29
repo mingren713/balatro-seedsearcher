@@ -1433,7 +1433,7 @@ $("go").onclick=()=>{
       (g.soul?" ✦灵魂牌":"")).join("<br>");
     $("hits").insertAdjacentHTML("afterbegin",
       '<div class="hit"><button class="cp">复制</button>'+
-      '<div class="seed">'+seed+'</div><div class="where">'+txt+"</div></div>");
+      '<div class="seed" data-seed="'+seed+'">'+seed+'</div><div class="where">'+txt+"</div></div>");
     allHits.push({seed:seed,where:where});
     $("tools").style.display="flex";
   };
@@ -1510,22 +1510,17 @@ document.addEventListener("click",e=>{
 $("tipclose").onclick=()=>{$("tip").style.display="none";};
 $("tip").addEventListener("click",e=>{if(e.target.id==="tip")$("tip").style.display="none";});
 
-/* ===== 点种子复制 ===== */
-document.addEventListener("click",e=>{
-  const s=e.target.closest(".seed");
-  if(!s)return;
-  const t=s.textContent.trim();
-  if(navigator.clipboard)navigator.clipboard.writeText(t);
-  const old=s.textContent;
-  s.textContent="已复制";
-  setTimeout(()=>{s.textContent=old;},700);
-});
-
-
 /* ===== 复制 / 导出 ===== */
 let allHits=[];
-function copyText(t,btn){
-  const done=()=>{ if(btn){const o=btn.textContent;btn.textContent="已复制";setTimeout(()=>btn.textContent=o,800);} };
+function copyText(t,btn,onDone){
+  const done=()=>{
+    if(btn){
+      const o=btn.textContent;
+      btn.textContent="已复制";
+      setTimeout(()=>btn.textContent=o,800);
+    }
+    if(onDone)onDone();
+  };
   if(navigator.clipboard&&navigator.clipboard.writeText){
     navigator.clipboard.writeText(t).then(done,()=>fallback(t,done));
   } else fallback(t,done);
@@ -1540,16 +1535,20 @@ function fallback(t,cb){
 document.addEventListener("click",e=>{
   const cp=e.target.closest(".cp");
   if(cp){
-    const seed=cp.parentElement.querySelector(".seed").textContent.trim();
+    const seedEl=cp.parentElement.querySelector(".seed");
+    const seed=seedEl.dataset.seed||seedEl.textContent.trim();
     copyText(seed,cp);
     return;
   }
   const sd=e.target.closest(".seed");
   if(sd&&!e.target.closest(".cp")){
-    const t=sd.textContent.trim();
-    copyText(t);
-    const o=sd.textContent;sd.textContent="已复制";
-    setTimeout(()=>{sd.textContent=o;},700);
+    const t=sd.dataset.seed||sd.textContent.trim();
+    sd.dataset.seed=t;
+    copyText(t,null,()=>{
+      clearTimeout(sd._copyTimer);
+      sd.textContent="已复制";
+      sd._copyTimer=setTimeout(()=>{sd.textContent=t;},700);
+    });
   }
 });
 

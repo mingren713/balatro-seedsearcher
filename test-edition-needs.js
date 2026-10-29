@@ -12,6 +12,10 @@ if (!html.includes('✦ 灵魂牌 → '))
   throw new Error("seed analysis should label Soul cards explicitly");
 if (!html.includes("前 4 底注的已分析卡包中没有发现灵魂牌"))
   throw new Error("seed analysis should report when no Soul card is found");
+if (!html.includes('class="seed" data-seed="'))
+  throw new Error("seed results should preserve the original seed while showing copy feedback");
+if ((html.match(/const sd=e\.target\.closest\("\.seed"\)/g) || []).length !== 1)
+  throw new Error("seed results should have exactly one click-to-copy handler");
 
 const tests = `
   const soulRun = {
