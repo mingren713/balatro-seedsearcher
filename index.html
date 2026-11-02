@@ -278,6 +278,9 @@
     </label>
     <span class="i" data-tip="packs">i</span>
   </div>
+  <label style="display:flex;align-items:center;gap:7px;margin-top:8px;color:var(--dim);font-size:13px;cursor:pointer">
+    <input type="checkbox" id="separate-packs" style="width:auto;margin:0;clip-path:none"> 目标小丑不能来自同一个小丑包
+  </label>
   <div style="margin-top:12px;color:var(--chip);font-size:15px">
     <div style="display:flex;align-items:center;gap:8px">已经满足的条件（对应小丑不再锁）<span class="i" data-tip="gold">i</span></div>
     <div id="unlocks" style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px"></div>
@@ -633,7 +636,7 @@ function antePacks(run,ante,state,stickerMode){
     if(ante<=2&&!state.firstPack){ state.firstPack=true; p="Buffoon Pack"; }
     else p=run.weighted("shop_pack"+ante,PACKS);
     if(p==="RETRY")continue;
-    res.push({pack:p,cards:openPack(run,p,ante,stickerMode)});
+    res.push({pack:p,id:ante+":"+i,cards:openPack(run,p,ante,stickerMode)});
   }
   return res;
 }
@@ -652,7 +655,8 @@ function scanSeed(seed,antes,slots,withPacks,stickerMode){
       for(const p of antePacks(run,a,st,stickerMode))
         for(const c of p.cards)
           if(c.type==="joker")found.push({name:c.name,ante:a,slot:0,
-            edition:c.edition,sticker:c.sticker,soul:c.soul,from:packName(p.pack)});
+            edition:c.edition,sticker:c.sticker,soul:c.soul,from:packName(p.pack),
+            packId:packInfo(p.pack).kind==="Buffoon Pack"?p.id:null});
     }
   }
   return found;
@@ -665,10 +669,11 @@ function indexFromSeed(str){
   for(let i=0;i<8;i++){const p=CHARS.indexOf(s[i]);n=n*35+(p<0?0:p);}
   return n;
 }
-function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode){
+function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks){
   const got=scanSeed(seed,maxAnte,slots,withPacks,stickerMode);
   const out=new Array(groups.length);
   const used=new Set();
+  const usedPacks=new Set();
   const needed=editionNeeds||{};
   const counts={};
   const needKeys=Object.keys(needed).filter(k=>needed[k]>0);
@@ -680,7 +685,8 @@ function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode)
     const candidates=[];const seen=new Set();
     for(const w of groups[i]) for(let gi=0;gi<got.length;gi++){
       const g=got[gi];
-      if(!seen.has(gi)&&!used.has(gi)&&g.name===w.name&&g.ante<=w.ante&&
+      if(!seen.has(gi)&&!used.has(gi)&&(!separatePacks||!g.packId||!usedPacks.has(g.packId))&&
+        g.name===w.name&&g.ante<=w.ante&&
         (!w.ed||g.edition===w.ed)&&(!w.sticker||g.sticker===w.sticker)){
         seen.add(gi);candidates.push([gi,g]);
       }
@@ -689,9 +695,11 @@ function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode)
       Math.max(0,(needed[a[1].edition]||0)-(counts[a[1].edition]||0)));
     for(const [gi,g] of candidates){
       used.add(gi);out[i]=g;
+      if(separatePacks&&g.packId)usedPacks.add(g.packId);
       if(g.edition)counts[g.edition]=(counts[g.edition]||0)+1;
       if(search(i+1))return true;
       if(g.edition)counts[g.edition]--;
+      if(separatePacks&&g.packId)usedPacks.delete(g.packId);
       used.delete(gi);
     }
     return false;
@@ -703,7 +711,7 @@ function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode)
 const RAR_OF={};
 for(const r of [1,2,3,4]) for(const j of POOLS[r]) RAR_OF[j]=r;
 
-function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode){
+function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks){
   const needRar=new Set();
   let needLeg=false;
   const allWants=[];
@@ -724,7 +732,7 @@ function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode){
     if(g.every(w=>RAR_OF[w.name]===4))legGroups.push(i);
     for(const w of g) if(RAR_OF[w.name]===4) legMax=Math.max(legMax,w.ante);
   });
-  return {needRar,needLeg,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks,editionNeeds,stickerMode};
+  return {needRar,needLeg,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks};
 }
 
 /* 每个底注用到的 key 编号，第一次用到时登记 */
@@ -831,7 +839,7 @@ function fastScan(seed,plan){
 /* 对外：先快速排除，看着有戏再用完整版确认 */
 function matchFast(seed,plan){
   if(!fastScan(seed,plan))return null;
-  return matchSeed(seed,plan.groups,plan.slots,plan.maxAnte,plan.withPacks,plan.editionNeeds,plan.stickerMode);
+  return matchSeed(seed,plan.groups,plan.slots,plan.maxAnte,plan.withPacks,plan.editionNeeds,plan.stickerMode,plan.separatePacks);
 }
 </script>
 
@@ -1141,7 +1149,7 @@ function antePacks(run,ante,state,stickerMode){
     if(ante<=2&&!state.firstPack){ state.firstPack=true; p="Buffoon Pack"; }
     else p=run.weighted("shop_pack"+ante,PACKS);
     if(p==="RETRY")continue;
-    res.push({pack:p,cards:openPack(run,p,ante,stickerMode)});
+    res.push({pack:p,id:ante+":"+i,cards:openPack(run,p,ante,stickerMode)});
   }
   return res;
 }
@@ -1160,7 +1168,8 @@ function scanSeed(seed,antes,slots,withPacks,stickerMode){
       for(const p of antePacks(run,a,st,stickerMode))
         for(const c of p.cards)
           if(c.type==="joker")found.push({name:c.name,ante:a,slot:0,
-            edition:c.edition,sticker:c.sticker,soul:c.soul,from:packName(p.pack)});
+            edition:c.edition,sticker:c.sticker,soul:c.soul,from:packName(p.pack),
+            packId:packInfo(p.pack).kind==="Buffoon Pack"?p.id:null});
     }
   }
   return found;
@@ -1173,10 +1182,11 @@ function indexFromSeed(str){
   for(let i=0;i<8;i++){const p=CHARS.indexOf(s[i]);n=n*35+(p<0?0:p);}
   return n;
 }
-function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode){
+function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks){
   const got=scanSeed(seed,maxAnte,slots,withPacks,stickerMode);
   const out=new Array(groups.length);
   const used=new Set();
+  const usedPacks=new Set();
   const needed=editionNeeds||{};
   const counts={};
   const needKeys=Object.keys(needed).filter(k=>needed[k]>0);
@@ -1188,7 +1198,8 @@ function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode)
     const candidates=[];const seen=new Set();
     for(const w of groups[i]) for(let gi=0;gi<got.length;gi++){
       const g=got[gi];
-      if(!seen.has(gi)&&!used.has(gi)&&g.name===w.name&&g.ante<=w.ante&&
+      if(!seen.has(gi)&&!used.has(gi)&&(!separatePacks||!g.packId||!usedPacks.has(g.packId))&&
+        g.name===w.name&&g.ante<=w.ante&&
         (!w.ed||g.edition===w.ed)&&(!w.sticker||g.sticker===w.sticker)){
         seen.add(gi);candidates.push([gi,g]);
       }
@@ -1197,9 +1208,11 @@ function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode)
       Math.max(0,(needed[a[1].edition]||0)-(counts[a[1].edition]||0)));
     for(const [gi,g] of candidates){
       used.add(gi);out[i]=g;
+      if(separatePacks&&g.packId)usedPacks.add(g.packId);
       if(g.edition)counts[g.edition]=(counts[g.edition]||0)+1;
       if(search(i+1))return true;
       if(g.edition)counts[g.edition]--;
+      if(separatePacks&&g.packId)usedPacks.delete(g.packId);
       used.delete(gi);
     }
     return false;
@@ -1211,7 +1224,7 @@ function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode)
 const RAR_OF={};
 for(const r of [1,2,3,4]) for(const j of POOLS[r]) RAR_OF[j]=r;
 
-function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode){
+function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks){
   const needRar=new Set();
   let needLeg=false;
   const allWants=[];
@@ -1232,7 +1245,7 @@ function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode){
     if(g.every(w=>RAR_OF[w.name]===4))legGroups.push(i);
     for(const w of g) if(RAR_OF[w.name]===4) legMax=Math.max(legMax,w.ante);
   });
-  return {needRar,needLeg,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks,editionNeeds,stickerMode};
+  return {needRar,needLeg,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks};
 }
 
 /* 每个底注用到的 key 编号，第一次用到时登记 */
@@ -1339,7 +1352,7 @@ function fastScan(seed,plan){
 /* 对外：先快速排除，看着有戏再用完整版确认 */
 function matchFast(seed,plan){
   if(!fastScan(seed,plan))return null;
-  return matchSeed(seed,plan.groups,plan.slots,plan.maxAnte,plan.withPacks,plan.editionNeeds,plan.stickerMode);
+  return matchSeed(seed,plan.groups,plan.slots,plan.maxAnte,plan.withPacks,plan.editionNeeds,plan.stickerMode,plan.separatePacks);
 }
 
 const CN={"Joker": "小丑", "Greedy Joker": "贪婪小丑", "Lusty Joker": "色欲小丑", "Wrathful Joker": "愤怒小丑", "Gluttonous Joker": "暴食小丑", "Jolly Joker": "开心小丑", "Zany Joker": "古怪小丑", "Mad Joker": "疯狂小丑", "Crazy Joker": "狂野小丑", "Droll Joker": "滑稽小丑", "Sly Joker": "奸诈小丑", "Wily Joker": "狡猾小丑", "Clever Joker": "聪敏小丑", "Devious Joker": "阴险小丑", "Crafty Joker": "精明小丑", "Half Joker": "半张小丑", "Credit Card": "信用卡", "Banner": "旗帜", "Mystic Summit": "神秘之峰", " 8 Ball": "八号球", "Misprint": "印错", "Raised Fist": "致胜之拳", "Chaos the Clown": "混沌小丑", "Scary Face": "恐怖面孔", "Abstract Joker": "抽象小丑", "Delayed Gratification": "延迟满足", "Gros Michel": "大麦克香蕉", "Even Steven": "偶数史蒂文", "Odd Todd": "奇数托德", "Scholar": "学者", "Business Card": "名片", "Supernova": "超新星", "Ride the Bus": "搭乘巴士", "Egg": "蛋", "Runner": "跑步选手", "Ice Cream": "冰淇淋", "Splash": "飞溅", "Blue Joker": "蓝色小丑", "Faceless Joker": "无面小丑", "Green Joker": "绿色小丑", "Superposition": "叠加态", "To Do List": "待办清单", "Cavendish": "卡文迪什", "Red Card": "红牌", "Square Joker": "方块小丑", "Riff raff": "乌合之众", "Photograph": "照片", "Reserved Parking": "私人车位", "Mail In Rebate": "邮件回扣", "Hallucination": "幻觉", "Fortune Teller": "占卜师", "Juggler": "杂耍师", "Drunkard": "醉汉", "Golden Joker": "黄金小丑", "Popcorn": "爆米花", "Walkie Talkie": "对讲机", "Smiley Face": "笑脸", "Golden Ticket": "金票", "Swashbuckler": "侠盗", "Hanging Chad": "未断选票", "Shoot the Moon": "射月", "Joker Stencil": "小丑模板", "Four Fingers": "四指", "Mime": "哑剧演员", "Ceremonial Dagger": "仪式匕首", "Marble Joker": "大理石小丑", "Loyalty Card": "会员卡", "Dusk": "黄昏", "Fibonacci": "斐波那契", "Steel Joker": "钢铁小丑", "Hack": "烂脱口秀演员", "Pareidolia": "幻视", "Space Joker": "太空小丑", "Burglar": "窃贼", "Blackboard": "黑板", "Sixth Sense": "第六感", "Constellation": "星座", "Hiker": "徒步者", "Card Sharp": "老千小丑", "Madness": "疯狂", "Seance": "通灵", "Vampire": "吸血鬼", "Shortcut": "捷径", "Hologram": "全息影像", "Cloud 9": "九霄云外", "Rocket": "火箭", "Midas Mask": "迈达斯面具", "Luchador": "摔角手", "Gift Card": "礼品卡", "Turtle Bean": "龟豆", "Erosion": "侵蚀", "To the Moon": "飞向月球", "Stone Joker": "石头小丑", "Lucky Cat": "幸运猫", "Bull": "公牛", "Diet Cola": "无糖可乐", "Trading Card": "交易卡", "Flash Card": "抽认卡", "Spare Trousers": "备用长裤", "Ramen": "拉面", "Seltzer": "苏打水", "Castle": "城堡", "Mr Bones": "骷髅先生", "Acrobat": "杂技演员", "Sock and Buskin": "悲与喜", "Troubadour": "吟游诗人", "Certificate": "证书", "Smeared Joker": "涂抹小丑", "Throwback": "复古", "Rough Gem": "原石", "Bloodstone": "血石", "Arrowhead": "箭头", "Onyx Agate": "缟玛瑙", "Glass Joker": "玻璃小丑", "Showman": "马戏团长", "Flower Pot": "花盆", "Merry Andy": "快乐安迪", "Oops All 6s": "六六大顺", "The Idol": "偶像", "Seeing Double": "重影", "Matador": "斗牛士", "Satellite": "卫星", "Cartomancer": "纸牌占卜师", "Astronomer": "天文学家", "Bootstraps": "提靴带", "DNA": "DNA", "Vagabond": "流浪汉", "Baron": "男爵", "Obelisk": "方尖碑", "Baseball Card": "棒球卡", "Ancient Joker": "古代小丑", "Campfire": "营火", "Blueprint": "蓝图", "Wee Joker": "小小丑", "Hit the Road": "上路吧杰克", "The Duo": "二重奏", "The Trio": "三重奏", "The Family": "一家人", "The Order": "秩序", "The Tribe": "部落", "Stuntman": "特技演员", "Invisible Joker": "隐形小丑", "Brainstorm": "头脑风暴", "Drivers License": "驾驶执照", "Burnt Joker": "烧焦小丑", "Canio": "卡尼奥", "Triboulet": "特里布莱", "Yorick": "约里克", "Chicot": "希科", "Perkeo": "帕奇欧"};
@@ -1459,7 +1472,7 @@ const WORKER_SRC = document.getElementById('engine-src').textContent + `
 onmessage = function(e){
   var d=e.data, hits=[];
   setUnlocks(d.unlocks);
-  var plan=makePlan(d.groups,d.slots,d.maxAnte,d.withPacks,d.editionNeeds,d.stickerMode);
+  var plan=makePlan(d.groups,d.slots,d.maxAnte,d.withPacks,d.editionNeeds,d.stickerMode,d.separatePacks);
   for(var i=0;i<d.count;i++){
     var seed=seedFromIndex(d.start+i);
     var m=matchFast(seed,plan);
@@ -1500,6 +1513,7 @@ $("go").onclick=()=>{
   const target=Math.max(1,parseInt($("found").value,10)||5);
   const maxAnte=Math.max(...groups.flat().map(w=>w.ante));
   const withPacks=$("packs").checked;
+  const separatePacks=$("separate-packs").checked;
   const stickerMode=$("sticker-mode").value;
   if(groups.flat().some(w=>w.sticker==="永恒")&&stickerMode==="none"){
     $("stat").textContent="当前赌注规则不会出现永恒贴纸，请选择黑注或更高赌注。";
@@ -1550,7 +1564,7 @@ $("go").onclick=()=>{
         if(!running||hits>=target){ if(pool.every(x=>x.idle))finish(); return; }
         w.idle=false;
         const start=cursor;cursor+=CHUNK;
-        w.postMessage({start,count:CHUNK,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,unlocks:readUnlocks()});
+        w.postMessage({start,count:CHUNK,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks,unlocks:readUnlocks()});
       };
       w.onmessage=ev=>{
         tried+=ev.data.tried;
@@ -1565,7 +1579,7 @@ $("go").onclick=()=>{
     (async()=>{
       $("stat").textContent="这个浏览器不让开多线程，用单核跑…";
       while(running&&hits<target){
-        const plan=makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode);
+        const plan=makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks);
         for(let n=0;n<3000&&running&&hits<target;n++){
           const seed=seedFromIndex(cursor++);tried++;
           const m=matchFast(seed,plan);
@@ -1809,6 +1823,7 @@ $("est").onclick=()=>{
   }
   const slots=parseInt($("slots").value,10)||0;
   const withPacks=$("packs").checked;
+  const separatePacks=$("separate-packs").checked;
   const stickerMode=$("sticker-mode").value;
   setUnlocks(readUnlocks());
   const box=$("odds");
@@ -1840,6 +1855,7 @@ $("est").onclick=()=>{
   else {lv="lv-hard";lvName="硬骨头";}
 
   txt="大约每 <span class=\"big\">"+one.toLocaleString()+"</span> 个种子出一个<br>";
+  if(separatePacks)txt+='<span style="color:var(--dim)">此粗估尚未计入“不同小丑包”限制，实际会更难。</span><br>';
   if(sec>1800)txt+='<br><span style="color:var(--dim)">太久的话，可以放宽条件，或用「+ 或者」多加几张备选。</span>';
 
   box.innerHTML='<span class="lv '+lv+'">'+lvName+'</span>'+describeGroups(groups)+describeEditionNeeds(editionNeeds)+

@@ -25,6 +25,8 @@ if ((html.match(/const sd=e\.target\.closest\("\.seed"\)/g) || []).length !== 1)
   throw new Error("seed results should have exactly one click-to-copy handler");
 if (!html.includes('id="sticker-mode"') || !html.includes('class="sticker"'))
   throw new Error("sticker rule and per-Joker sticker controls should be present");
+if (!html.includes('id="separate-packs"'))
+  throw new Error("different-Buffoon-pack control should be present");
 if (!html.includes('id="peek-antes"') || !html.includes("小盲跳过"))
   throw new Error("seed analysis should expose per-ante skip tags");
 
@@ -110,7 +112,28 @@ const tests = `
     throw new Error("matching Eternal sticker should pass");
   if (matchSeed("TEST",[[{name:"Blueprint",ante:2,ed:"",sticker:"易腐"}]],6,2,true,{},"both") !== null)
     throw new Error("wrong sticker should fail");
+
+  const packGroups = [
+    [{name:"Blueprint",ante:3,ed:""}],
+    [{name:"Brainstorm",ante:3,ed:""}]
+  ];
+  scanSeed = () => [
+    {name:"Blueprint",ante:1,edition:"",from:"小丑包",packId:"1:0"},
+    {name:"Brainstorm",ante:1,edition:"",from:"小丑包",packId:"1:0"},
+    {name:"Brainstorm",ante:2,edition:"",from:"小丑包",packId:"2:0"}
+  ];
+  const splitPacks = matchSeed("TEST",packGroups,6,3,true,{},"both",true);
+  if (!splitPacks || splitPacks[1].packId !== "2:0")
+    throw new Error("different-pack matching should backtrack to another Buffoon pack");
+  scanSeed = () => [
+    {name:"Blueprint",ante:1,edition:"",from:"小丑包",packId:"1:0"},
+    {name:"Brainstorm",ante:1,edition:"",from:"小丑包",packId:"1:0"}
+  ];
+  if (!matchSeed("TEST",packGroups,6,3,true,{},"both",false))
+    throw new Error("same-pack matching should remain available when the option is off");
+  if (matchSeed("TEST",packGroups,6,3,true,{},"both",true) !== null)
+    throw new Error("same Buffoon pack should fail when different packs are required");
 `;
 
 new Function(engineMatch[1] + tests)();
-console.log("OK: page scripts compile; skip tags, Soul, stickers, and aggregate edition matching pass");
+console.log("OK: page scripts compile; skip tags, Soul, stickers, aggregate editions, and pack separation pass");
