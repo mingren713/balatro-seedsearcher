@@ -669,8 +669,7 @@ function indexFromSeed(str){
   for(let i=0;i<8;i++){const p=CHARS.indexOf(s[i]);n=n*35+(p<0?0:p);}
   return n;
 }
-function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks){
-  const got=scanSeed(seed,maxAnte,slots,withPacks,stickerMode);
+function matchCandidates(got,groups,editionNeeds,separatePacks){
   const out=new Array(groups.length);
   const used=new Set();
   const usedPacks=new Set();
@@ -706,6 +705,9 @@ function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,
   };
   return search(0)?out:null;
 }
+function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks){
+  return matchCandidates(scanSeed(seed,maxAnte,slots,withPacks,stickerMode),groups,editionNeeds,separatePacks);
+}
 
 /* ===== 快速通道：只算条件用得上的东西，用来快速排除 ===== */
 const RAR_OF={};
@@ -720,6 +722,10 @@ function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separa
     const r=RAR_OF[w.name];
     if(r===4)needLeg=true; else needRar.add(r);
   }
+  const needNames=new Set(allWants.map(w=>w.name));
+  const needEditions=allWants.some(w=>w.ed)||Object.values(editionNeeds||{}).some(n=>n>0);
+  const needStickers=allWants.some(w=>w.sticker);
+  const needExact=needEditions||needStickers||separatePacks;
   const deadline={};
   for(const grp of groups){
     const maxA=Math.max(...grp.map(w=>w.ante));
@@ -732,7 +738,7 @@ function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separa
     if(g.every(w=>RAR_OF[w.name]===4))legGroups.push(i);
     for(const w of g) if(RAR_OF[w.name]===4) legMax=Math.max(legMax,w.ante);
   });
-  return {needRar,needLeg,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks};
+  return {needRar,needLeg,needNames,needEditions,needStickers,needExact,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks};
 }
 
 /* 每个底注用到的 key 编号，第一次用到时登记 */
@@ -746,15 +752,20 @@ function fk(a){
 }
 const K_J4=kid("Joker4");
 
-/* 返回 true = 这个种子有戏，值得完整算一遍。
-   分两遍：先只看灵魂牌（便宜，而且大多数种子在这里就被淘汰），再看普通到稀有小丑。
+/* 三级漏斗：先按牌名廉价排除；牌名通过后才重跑并核对版本、贴纸和包编号；
+   只有精确条件也通过，才交给完整版生成展示结果。
+   每轮内部再分两遍：先看灵魂牌，再看普通到稀有小丑。
    每条随机流只认自己的 key，不同 key 谁先算谁后算不影响结果；
    两遍都要用的卡包种类只掷一次，存起来给第二遍用。 */
 const _PK=[];
-function fastScan(seed,plan){
+function fastScan(seed,plan,exact){
   const run=_shared.reset(seed);
   const found=new Map();   /* 名字 → 最早出现的底注 */
-  const {needRar,needLeg,slots,maxAnte,withPacks,groups,gmax,legGroups,legMax}=plan;
+  const doExact=!!exact&&plan.needExact;
+  const candidates=doExact?[]:null;
+  const {needRar,needLeg,needNames,slots,maxAnte,withPacks,groups,gmax,legGroups,legMax}=plan;
+  const needEditions=doExact&&plan.needEditions;
+  const needStickers=doExact&&plan.needStickers;
   let packDone=0;
   const packsOf=a=>{       /* 第 a 底注的卡包，按底注顺序掷，掷过就记住 */
     while(packDone<a){
@@ -779,7 +790,9 @@ function fastScan(seed,plan){
           for(let k=0;k<info.size;k++)
             if(run.randId(K.sT)>0.997){
               const n=run.choiceId(K_J4,POOLS[4]);
+              const edition=needEditions?jokerEdition(run,"sou",a):"";
               if(!found.has(n))found.set(n,a);
+              if(doExact&&needNames.has(n))candidates.push({name:n,ante:a,edition,sticker:null,packId:null});
               break;
             }
         } else if(info.kind==="Spectral Pack"){
@@ -788,7 +801,13 @@ function fastScan(seed,plan){
             const isSoul=!sd&&run.randId(K.sS)>0.997;
             const isHole=!hd&&run.randId(K.sS)>0.997;
             if(isHole)hd=true;
-            else if(isSoul){sd=true;const n=run.choiceId(K_J4,POOLS[4]);if(!found.has(n))found.set(n,a);}
+            else if(isSoul){
+              sd=true;
+              const n=run.choiceId(K_J4,POOLS[4]);
+              const edition=needEditions?jokerEdition(run,"sou",a):"";
+              if(!found.has(n))found.set(n,a);
+              if(doExact&&needNames.has(n))candidates.push({name:n,ante:a,edition,sticker:null,packId:null});
+            }
           }
         }
       }
@@ -807,15 +826,23 @@ function fastScan(seed,plan){
         if(t<20){
           const r=run.randId(K.rSho);
           const rar=r>0.95?3:(r>0.7?2:1);
+          let n=null;
           if(needRar.has(rar)){
-            const n=run.choiceId(K.jSho[rar],POOLS[rar],GATED_JOKERS);
+            n=run.choiceId(K.jSho[rar],POOLS[rar],GATED_JOKERS);
             if(!found.has(n))found.set(n,a);
           }
+          const sticker=needStickers
+            ?(n?jokerSticker(run,"sho",a,plan.stickerMode,n):(run.rand("etperpoll"+a),null)):null;
+          const edition=needEditions?jokerEdition(run,"sho",a):"";
+          if(doExact&&n&&needNames.has(n))
+            candidates.push({name:n,ante:a,edition,sticker,packId:null});
         }                                         /* 商店的塔罗/星球不会翻灵魂牌 */
       }
       if(withPacks){
         let locked=null;
-        for(const p of packsOf(a)){
+        const packs=packsOf(a);
+        for(let pi=0;pi<packs.length;pi++){
+          const p=packs[pi];
           const info=packInfo(p);
           if(info.kind!=="Buffoon Pack")continue;
           locked=new Set(GATED_JOKERS);
@@ -825,6 +852,10 @@ function fastScan(seed,plan){
             const n=run.choiceId(K.jBuf[rar],POOLS[rar],locked);
             locked.add(n);
             if(needRar.has(rar)&&!found.has(n))found.set(n,a);
+            const sticker=needStickers?jokerSticker(run,"buf",a,plan.stickerMode,n):null;
+            const edition=needEditions?jokerEdition(run,"buf",a):"";
+            if(doExact&&needNames.has(n))
+              candidates.push({name:n,ante:a,edition,sticker,packId:a+":"+pi});
           }
         }
       }
@@ -833,10 +864,11 @@ function fastScan(seed,plan){
     for(let g=0;g<groups.length;g++) if(a>=gmax[g]&&!groupOk(g)) return false;
   }
   for(let g=0;g<groups.length;g++) if(!groupOk(g)) return false;
-  return true;
+  if(doExact)return matchCandidates(candidates,groups,plan.editionNeeds,plan.separatePacks);
+  return plan.needExact?fastScan(seed,plan,true):true;
 }
 
-/* 对外：先快速排除，看着有戏再用完整版确认 */
+/* 对外：快速通道已经确认全部约束后，完整版只负责生成展示结果 */
 function matchFast(seed,plan){
   if(!fastScan(seed,plan))return null;
   return matchSeed(seed,plan.groups,plan.slots,plan.maxAnte,plan.withPacks,plan.editionNeeds,plan.stickerMode,plan.separatePacks);
@@ -1182,8 +1214,7 @@ function indexFromSeed(str){
   for(let i=0;i<8;i++){const p=CHARS.indexOf(s[i]);n=n*35+(p<0?0:p);}
   return n;
 }
-function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks){
-  const got=scanSeed(seed,maxAnte,slots,withPacks,stickerMode);
+function matchCandidates(got,groups,editionNeeds,separatePacks){
   const out=new Array(groups.length);
   const used=new Set();
   const usedPacks=new Set();
@@ -1219,6 +1250,9 @@ function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,
   };
   return search(0)?out:null;
 }
+function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks){
+  return matchCandidates(scanSeed(seed,maxAnte,slots,withPacks,stickerMode),groups,editionNeeds,separatePacks);
+}
 
 /* ===== 快速通道：只算条件用得上的东西，用来快速排除 ===== */
 const RAR_OF={};
@@ -1233,6 +1267,10 @@ function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separa
     const r=RAR_OF[w.name];
     if(r===4)needLeg=true; else needRar.add(r);
   }
+  const needNames=new Set(allWants.map(w=>w.name));
+  const needEditions=allWants.some(w=>w.ed)||Object.values(editionNeeds||{}).some(n=>n>0);
+  const needStickers=allWants.some(w=>w.sticker);
+  const needExact=needEditions||needStickers||separatePacks;
   const deadline={};
   for(const grp of groups){
     const maxA=Math.max(...grp.map(w=>w.ante));
@@ -1245,7 +1283,7 @@ function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separa
     if(g.every(w=>RAR_OF[w.name]===4))legGroups.push(i);
     for(const w of g) if(RAR_OF[w.name]===4) legMax=Math.max(legMax,w.ante);
   });
-  return {needRar,needLeg,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks};
+  return {needRar,needLeg,needNames,needEditions,needStickers,needExact,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks};
 }
 
 /* 每个底注用到的 key 编号，第一次用到时登记 */
@@ -1259,15 +1297,20 @@ function fk(a){
 }
 const K_J4=kid("Joker4");
 
-/* 返回 true = 这个种子有戏，值得完整算一遍。
-   分两遍：先只看灵魂牌（便宜，而且大多数种子在这里就被淘汰），再看普通到稀有小丑。
+/* 三级漏斗：先按牌名廉价排除；牌名通过后才重跑并核对版本、贴纸和包编号；
+   只有精确条件也通过，才交给完整版生成展示结果。
+   每轮内部再分两遍：先看灵魂牌，再看普通到稀有小丑。
    每条随机流只认自己的 key，不同 key 谁先算谁后算不影响结果；
    两遍都要用的卡包种类只掷一次，存起来给第二遍用。 */
 const _PK=[];
-function fastScan(seed,plan){
+function fastScan(seed,plan,exact){
   const run=_shared.reset(seed);
   const found=new Map();   /* 名字 → 最早出现的底注 */
-  const {needRar,needLeg,slots,maxAnte,withPacks,groups,gmax,legGroups,legMax}=plan;
+  const doExact=!!exact&&plan.needExact;
+  const candidates=doExact?[]:null;
+  const {needRar,needLeg,needNames,slots,maxAnte,withPacks,groups,gmax,legGroups,legMax}=plan;
+  const needEditions=doExact&&plan.needEditions;
+  const needStickers=doExact&&plan.needStickers;
   let packDone=0;
   const packsOf=a=>{       /* 第 a 底注的卡包，按底注顺序掷，掷过就记住 */
     while(packDone<a){
@@ -1292,7 +1335,9 @@ function fastScan(seed,plan){
           for(let k=0;k<info.size;k++)
             if(run.randId(K.sT)>0.997){
               const n=run.choiceId(K_J4,POOLS[4]);
+              const edition=needEditions?jokerEdition(run,"sou",a):"";
               if(!found.has(n))found.set(n,a);
+              if(doExact&&needNames.has(n))candidates.push({name:n,ante:a,edition,sticker:null,packId:null});
               break;
             }
         } else if(info.kind==="Spectral Pack"){
@@ -1301,7 +1346,13 @@ function fastScan(seed,plan){
             const isSoul=!sd&&run.randId(K.sS)>0.997;
             const isHole=!hd&&run.randId(K.sS)>0.997;
             if(isHole)hd=true;
-            else if(isSoul){sd=true;const n=run.choiceId(K_J4,POOLS[4]);if(!found.has(n))found.set(n,a);}
+            else if(isSoul){
+              sd=true;
+              const n=run.choiceId(K_J4,POOLS[4]);
+              const edition=needEditions?jokerEdition(run,"sou",a):"";
+              if(!found.has(n))found.set(n,a);
+              if(doExact&&needNames.has(n))candidates.push({name:n,ante:a,edition,sticker:null,packId:null});
+            }
           }
         }
       }
@@ -1320,15 +1371,23 @@ function fastScan(seed,plan){
         if(t<20){
           const r=run.randId(K.rSho);
           const rar=r>0.95?3:(r>0.7?2:1);
+          let n=null;
           if(needRar.has(rar)){
-            const n=run.choiceId(K.jSho[rar],POOLS[rar],GATED_JOKERS);
+            n=run.choiceId(K.jSho[rar],POOLS[rar],GATED_JOKERS);
             if(!found.has(n))found.set(n,a);
           }
+          const sticker=needStickers
+            ?(n?jokerSticker(run,"sho",a,plan.stickerMode,n):(run.rand("etperpoll"+a),null)):null;
+          const edition=needEditions?jokerEdition(run,"sho",a):"";
+          if(doExact&&n&&needNames.has(n))
+            candidates.push({name:n,ante:a,edition,sticker,packId:null});
         }                                         /* 商店的塔罗/星球不会翻灵魂牌 */
       }
       if(withPacks){
         let locked=null;
-        for(const p of packsOf(a)){
+        const packs=packsOf(a);
+        for(let pi=0;pi<packs.length;pi++){
+          const p=packs[pi];
           const info=packInfo(p);
           if(info.kind!=="Buffoon Pack")continue;
           locked=new Set(GATED_JOKERS);
@@ -1338,6 +1397,10 @@ function fastScan(seed,plan){
             const n=run.choiceId(K.jBuf[rar],POOLS[rar],locked);
             locked.add(n);
             if(needRar.has(rar)&&!found.has(n))found.set(n,a);
+            const sticker=needStickers?jokerSticker(run,"buf",a,plan.stickerMode,n):null;
+            const edition=needEditions?jokerEdition(run,"buf",a):"";
+            if(doExact&&needNames.has(n))
+              candidates.push({name:n,ante:a,edition,sticker,packId:a+":"+pi});
           }
         }
       }
@@ -1346,10 +1409,11 @@ function fastScan(seed,plan){
     for(let g=0;g<groups.length;g++) if(a>=gmax[g]&&!groupOk(g)) return false;
   }
   for(let g=0;g<groups.length;g++) if(!groupOk(g)) return false;
-  return true;
+  if(doExact)return matchCandidates(candidates,groups,plan.editionNeeds,plan.separatePacks);
+  return plan.needExact?fastScan(seed,plan,true):true;
 }
 
-/* 对外：先快速排除，看着有戏再用完整版确认 */
+/* 对外：快速通道已经确认全部约束后，完整版只负责生成展示结果 */
 function matchFast(seed,plan){
   if(!fastScan(seed,plan))return null;
   return matchSeed(seed,plan.groups,plan.slots,plan.maxAnte,plan.withPacks,plan.editionNeeds,plan.stickerMode,plan.separatePacks);

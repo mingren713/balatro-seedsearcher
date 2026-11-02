@@ -133,7 +133,20 @@ const tests = `
     throw new Error("same-pack matching should remain available when the option is off");
   if (matchSeed("TEST",packGroups,6,3,true,{},"both",true) !== null)
     throw new Error("same Buffoon pack should fail when different packs are required");
+
+  const hardGroups = [
+    [{name:"Madness",ante:8,ed:"多彩",sticker:""}],
+    [{name:"Riff raff",ante:8,ed:"多彩",sticker:"永恒"}]
+  ];
+  const hardPlan = makePlan(hardGroups,6,8,true,{},"both",true);
+  if (fastScan("AAAAAAAX",hardPlan))
+    throw new Error("exact fast scan should reject a name-only false positive");
+  let fullScanCalls = 0;
+  matchSeed = () => { fullScanCalls++; return null; };
+  matchFast("AAAAAAAX",hardPlan);
+  if (fullScanCalls !== 0)
+    throw new Error("rejected exact candidates should not enter the full scan");
 `;
 
 new Function(engineMatch[1] + tests)();
-console.log("OK: page scripts compile; skip tags, Soul, stickers, aggregate editions, and pack separation pass");
+console.log("OK: page scripts compile; exact fast filtering, skip tags, Soul, stickers, aggregate editions, and pack separation pass");
