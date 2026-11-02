@@ -25,6 +25,9 @@ if ((html.match(/const sd=e\.target\.closest\("\.seed"\)/g) || []).length !== 1)
   throw new Error("seed results should have exactly one click-to-copy handler");
 if (!html.includes('id="sticker-mode"') || !html.includes('class="sticker"'))
   throw new Error("sticker rule and per-Joker sticker controls should be present");
+if (!html.includes('const STICKERS=["","永恒","易腐","非易腐"]') ||
+    !html.includes('w.sticker==="非易腐"'))
+  throw new Error("non-Perishable sticker option and probability estimate should be present");
 if (!html.includes('id="separate-packs"'))
   throw new Error("different-Buffoon-pack control should be present");
 if (!html.includes('id="peek-antes"') || !html.includes("小盲跳过"))
@@ -112,6 +115,14 @@ const tests = `
     throw new Error("matching Eternal sticker should pass");
   if (matchSeed("TEST",[[{name:"Blueprint",ante:2,ed:"",sticker:"易腐"}]],6,2,true,{},"both") !== null)
     throw new Error("wrong sticker should fail");
+  if (!matchSeed("TEST",[[{name:"Blueprint",ante:2,ed:"",sticker:"非易腐"}]],6,2,true,{},"both"))
+    throw new Error("Eternal should satisfy non-Perishable");
+  scanSeed = () => [{name:"Blueprint",ante:1,edition:"",sticker:null,from:"shop"}];
+  if (!matchSeed("TEST",[[{name:"Blueprint",ante:2,ed:"",sticker:"非易腐"}]],6,2,true,{},"both"))
+    throw new Error("no sticker should satisfy non-Perishable");
+  scanSeed = () => [{name:"Blueprint",ante:1,edition:"",sticker:"易腐",from:"shop"}];
+  if (matchSeed("TEST",[[{name:"Blueprint",ante:2,ed:"",sticker:"非易腐"}]],6,2,true,{},"both") !== null)
+    throw new Error("Perishable should not satisfy non-Perishable");
 
   const packGroups = [
     [{name:"Blueprint",ante:3,ed:""}],
@@ -149,4 +160,4 @@ const tests = `
 `;
 
 new Function(engineMatch[1] + tests)();
-console.log("OK: page scripts compile; exact fast filtering, skip tags, Soul, stickers, aggregate editions, and pack separation pass");
+console.log("OK: page scripts compile; non-Perishable, exact fast filtering, skip tags, Soul, stickers, aggregate editions, and pack separation pass");

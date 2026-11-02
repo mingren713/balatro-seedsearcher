@@ -486,6 +486,9 @@ function jokerSticker(run,src,ante,mode,name){
   if(mode==="both"&&p>0.4&&p<=0.7&&!NO_PERISHABLE.has(name))return "易腐";
   return null;
 }
+function stickerMatches(actual,wanted){
+  return !wanted||(wanted==="非易腐"?actual!=="易腐":actual===wanted);
+}
 
 /* 开局就锁住的牌：源码里它们在池子里占着位子（UNAVAILABLE），抽到了要重抽 */
 /* 金票/钢铁/石头/幸运猫/玻璃 要牌组里有对应增强牌；卡文迪什要大麦克香蕉灭绝过 */
@@ -686,7 +689,7 @@ function matchCandidates(got,groups,editionNeeds,separatePacks){
       const g=got[gi];
       if(!seen.has(gi)&&!used.has(gi)&&(!separatePacks||!g.packId||!usedPacks.has(g.packId))&&
         g.name===w.name&&g.ante<=w.ante&&
-        (!w.ed||g.edition===w.ed)&&(!w.sticker||g.sticker===w.sticker)){
+        (!w.ed||g.edition===w.ed)&&stickerMatches(g.sticker,w.sticker)){
         seen.add(gi);candidates.push([gi,g]);
       }
     }
@@ -1031,6 +1034,9 @@ function jokerSticker(run,src,ante,mode,name){
   if(mode==="both"&&p>0.4&&p<=0.7&&!NO_PERISHABLE.has(name))return "易腐";
   return null;
 }
+function stickerMatches(actual,wanted){
+  return !wanted||(wanted==="非易腐"?actual!=="易腐":actual===wanted);
+}
 
 /* 开局就锁住的牌：源码里它们在池子里占着位子（UNAVAILABLE），抽到了要重抽 */
 /* 金票/钢铁/石头/幸运猫/玻璃 要牌组里有对应增强牌；卡文迪什要大麦克香蕉灭绝过 */
@@ -1231,7 +1237,7 @@ function matchCandidates(got,groups,editionNeeds,separatePacks){
       const g=got[gi];
       if(!seen.has(gi)&&!used.has(gi)&&(!separatePacks||!g.packId||!usedPacks.has(g.packId))&&
         g.name===w.name&&g.ante<=w.ante&&
-        (!w.ed||g.edition===w.ed)&&(!w.sticker||g.sticker===w.sticker)){
+        (!w.ed||g.edition===w.ed)&&stickerMatches(g.sticker,w.sticker)){
         seen.add(gi);candidates.push([gi,g]);
       }
     }
@@ -1423,7 +1429,7 @@ const CN={"Joker": "小丑", "Greedy Joker": "贪婪小丑", "Lusty Joker": "色
 
 const JPOS={"Joker": [0, 0], "Greedy Joker": [6, 1], "Lusty Joker": [7, 1], "Wrathful Joker": [8, 1], "Gluttonous Joker": [9, 1], "Jolly Joker": [2, 0], "Zany Joker": [3, 0], "Mad Joker": [4, 0], "Crazy Joker": [5, 0], "Droll Joker": [6, 0], "Sly Joker": [0, 14], "Wily Joker": [1, 14], "Clever Joker": [2, 14], "Devious Joker": [3, 14], "Crafty Joker": [4, 14], "Half Joker": [7, 0], "Credit Card": [5, 1], "Banner": [1, 2], "Mystic Summit": [2, 2], " 8 Ball": [0, 5], "Misprint": [6, 2], "Raised Fist": [8, 2], "Chaos the Clown": [1, 0], "Scary Face": [2, 3], "Abstract Joker": [3, 3], "Delayed Gratification": [4, 3], "Gros Michel": [7, 6], "Even Steven": [8, 3], "Odd Todd": [9, 3], "Scholar": [3, 6], "Business Card": [1, 4], "Supernova": [2, 4], "Ride the Bus": [1, 6], "Egg": [0, 10], "Runner": [3, 10], "Ice Cream": [4, 10], "Splash": [6, 10], "Blue Joker": [7, 10], "Faceless Joker": [1, 11], "Green Joker": [2, 11], "Superposition": [3, 11], "To Do List": [4, 11], "Cavendish": [5, 11], "Red Card": [7, 11], "Square Joker": [9, 11], "Riff raff": [1, 12], "Photograph": [2, 13], "Reserved Parking": [6, 13], "Mail In Rebate": [7, 13], "Hallucination": [9, 13], "Fortune Teller": [7, 5], "Juggler": [0, 1], "Drunkard": [1, 1], "Golden Joker": [9, 2], "Popcorn": [1, 15], "Walkie Talkie": [8, 15], "Smiley Face": [6, 15], "Golden Ticket": [5, 3], "Swashbuckler": [9, 5], "Hanging Chad": [9, 6], "Shoot the Moon": [2, 6], "Joker Stencil": [2, 5], "Four Fingers": [6, 6], "Mime": [4, 1], "Ceremonial Dagger": [5, 5], "Marble Joker": [3, 2], "Loyalty Card": [4, 2], "Dusk": [4, 7], "Fibonacci": [1, 5], "Steel Joker": [7, 2], "Hack": [5, 2], "Pareidolia": [6, 3], "Space Joker": [3, 5], "Burglar": [1, 10], "Blackboard": [2, 10], "Sixth Sense": [8, 10], "Constellation": [9, 10], "Hiker": [0, 11], "Card Sharp": [6, 11], "Madness": [8, 11], "Seance": [0, 12], "Vampire": [2, 12], "Shortcut": [3, 12], "Hologram": [4, 12], "Cloud 9": [7, 12], "Rocket": [8, 12], "Midas Mask": [0, 13], "Luchador": [1, 13], "Gift Card": [3, 13], "Turtle Bean": [4, 13], "Erosion": [5, 13], "To the Moon": [8, 13], "Stone Joker": [9, 0], "Lucky Cat": [5, 14], "Bull": [7, 14], "Diet Cola": [8, 14], "Trading Card": [9, 14], "Flash Card": [0, 15], "Spare Trousers": [4, 15], "Ramen": [2, 15], "Seltzer": [3, 15], "Castle": [9, 15], "Mr Bones": [3, 4], "Acrobat": [2, 1], "Sock and Buskin": [3, 1], "Troubadour": [0, 2], "Certificate": [8, 8], "Smeared Joker": [4, 6], "Throwback": [5, 7], "Rough Gem": [9, 7], "Bloodstone": [0, 8], "Arrowhead": [1, 8], "Onyx Agate": [2, 8], "Glass Joker": [1, 3], "Showman": [6, 5], "Flower Pot": [0, 6], "Merry Andy": [8, 0], "Oops All 6s": [5, 6], "The Idol": [6, 7], "Seeing Double": [4, 4], "Matador": [4, 5], "Satellite": [8, 7], "Cartomancer": [7, 3], "Astronomer": [2, 7], "Bootstraps": [9, 8], "DNA": [5, 10], "Vagabond": [5, 12], "Baron": [6, 12], "Obelisk": [9, 12], "Baseball Card": [6, 14], "Ancient Joker": [7, 15], "Campfire": [5, 15], "Blueprint": [0, 3], "Wee Joker": [0, 4], "Hit the Road": [8, 5], "The Duo": [5, 4], "The Trio": [6, 4], "The Family": [7, 4], "The Order": [8, 4], "The Tribe": [9, 4], "Stuntman": [8, 6], "Invisible Joker": [1, 7], "Brainstorm": [7, 7], "Drivers License": [0, 7], "Burnt Joker": [3, 7], "Canio": [3, 8], "Triboulet": [4, 8], "Yorick": [5, 8], "Chicot": [6, 8], "Perkeo": [7, 8]};
 const EDS=["","负片","多彩","全息","闪箔"];
-const STICKERS=["","永恒","易腐"];
+const STICKERS=["","永恒","易腐","非易腐"];
 const UNLOCK_OPTS=[["Golden Ticket","有黄金牌 → 金票"],["Steel Joker","有钢铁牌 → 钢铁小丑"],
   ["Stone Joker","有石头牌 → 石头小丑"],["Lucky Cat","有幸运牌 → 幸运猫"],
   ["Glass Joker","有玻璃牌 → 玻璃小丑"],["Cavendish","大麦克灭绝 → 卡文迪什"]];
@@ -1673,7 +1679,7 @@ const TIPS={
   from:"种子是按顺序一个个试过去的。<br><br>留空就随机挑个起点开始数；填一个种子则从它往后接着数。"+
        "上次搜到一半关掉了，把下面显示的“数到这里了”填进来就能续上。",
   edtotal:"这里限制的是所有独立条件最终命中的小丑合计版本，不绑定到具体名字。<br><br>例如添加蓝图、头脑风暴、男爵三个条件，把多彩填 1、负片填 1，就表示三张都要出现，而且其中任意一张是多彩、任意另一张是负片。<br><br>每张小丑最多只有一个版本，所以四项数量之和不能超过独立条件数量。",
-  stickers:"永恒贴纸从黑注开始出现；易腐贴纸从橙注开始出现。<br><br>请选择与你实际游玩相同的赌注范围。商店和小丑包使用不同的贴纸随机序列；灵魂牌生成的传奇小丑不会自动带永恒或易腐贴纸。"
+  stickers:"永恒贴纸从黑注开始出现；易腐贴纸从橙注开始出现。『非易腐』表示允许无贴纸或永恒，但排除易腐。<br><br>请选择与你实际游玩相同的赌注范围。商店和小丑包使用不同的贴纸随机序列；灵魂牌生成的传奇小丑不会自动带永恒或易腐贴纸。"
 };
 function showTip(k){
   if(!TIPS[k])return;
@@ -1779,6 +1785,10 @@ function packP(name){
 }
 function stickerProbability(w,mode){
   if(!w.sticker)return 1;
+  if(w.sticker==="非易腐"){
+    if(RAR_OF[w.name]===4||mode!=="both"||NO_PERISHABLE.has(w.name))return 1;
+    return 0.7;
+  }
   if(RAR_OF[w.name]===4)return 0; /* 灵魂牌生成的传奇不走商店/卡包贴纸流程 */
   if(w.sticker==="永恒")return mode!=="none"&&!NO_ETERNAL.has(w.name)?0.3:0;
   if(w.sticker==="易腐")return mode==="both"&&!NO_PERISHABLE.has(w.name)?0.3:0;
