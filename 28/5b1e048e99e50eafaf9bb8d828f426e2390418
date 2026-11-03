@@ -1,0 +1,35 @@
+index.html
+  s_a121d7fbc2aaf8::t_acfc8cb6c3fe3f 149,214,216-219,226,232,234,241-244,246-247,250,1714,2275
+  s_a121d7fbc2aaf8::t_2bcc3500fa8a81 1713,1715-1725,1728-1764,1770,1773-1774,1776
+  s_a121d7fbc2aaf8::t_cb3eb21c15914e 1615-1622
+  s_a121d7fbc2aaf8::t_0392aaaa407ace 2264,2271-2274,2285-2287,2289,2293,2306-2308
+  s_a121d7fbc2aaf8::t_64ce00c905c811 356-364
+  s_a121d7fbc2aaf8::t_e2d73579fb2f0a 1726-1727,1769
+  s_a121d7fbc2aaf8::t_52767fdb034a8a 2085-2148
+  s_a121d7fbc2aaf8::t_26f5391bd4cd42 2327-2328
+generate-spectral-data.js
+  s_a121d7fbc2aaf8::t_a347281309fce2 37,44-46,67-68
+test-edition-needs.js
+  s_a121d7fbc2aaf8::t_8aaed9ca806b5f 45-57
+  s_a121d7fbc2aaf8::t_12af830c8ffae9 28-29,80-82
+  s_a121d7fbc2aaf8::t_e2d73579fb2f0a 31
+  s_a121d7fbc2aaf8::t_b619253c749df6 223
+spectral-data.js
+  s_a121d7fbc2aaf8::t_8607b4edde5ecc 13-16,29-32,45-48,60-63,75-78,90-93,105-108,121-124,136-139,151-154,166-169,181-184,196-199,211-214,226-229,240-243,255-258,269-272
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "285b1e048e99e50eafaf9bb8d828f426e2390418",
+  "prompts": {},
+  "sessions": {
+    "s_a121d7fbc2aaf8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16286-66ac-7940-b08e-10507d3a977c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "mingren713 <1317114058@qq.com>"
+    }
+  }
+}
