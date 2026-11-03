@@ -18,6 +18,10 @@ if (missingDescriptions.length)
   throw new Error("missing Joker descriptions: " + missingDescriptions.join(", "));
 if (/\{[A-Z]:|#\d+#/.test(JSON.stringify(jokerDescriptions)))
   throw new Error("Joker descriptions should not expose localization markup or placeholders");
+if (JSON.stringify(jokerDescriptions).includes("…"))
+  throw new Error("Joker descriptions should explain variable values instead of showing ellipses");
+if (!html.includes("background:#fffdf5") || !html.includes("#jhover .jd{margin-top:6px;color:#17201f}"))
+  throw new Error("Joker hover cards should use a light background with dark description text");
 
 const executableScripts = [...html.matchAll(/<script(?![^>]*text\/plain)[^>]*>([\s\S]*?)<\/script>/g)];
 for (const [, source] of executableScripts) new Function(source);

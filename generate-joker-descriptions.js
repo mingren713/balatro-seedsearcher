@@ -55,6 +55,36 @@ const aliases = {
   j_oops: "Oops All 6s",
   j_drivers_license: "Drivers License"
 };
+
+// A few Jokers expose their localization variables in a different order from
+// their config table. Keep those orders explicit so values such as Stuntman's
+// chips/hand-size cannot be accidentally swapped.
+const valueOverrides = {
+  j_ancient: ["1.5", "指定花色"],
+  j_blackboard: ["3", "黑桃", "梅花"],
+  j_bootstraps: ["2", "5"],
+  j_castle: ["3", "指定花色", "0"],
+  j_cavendish: ["3", "1", "1000"],
+  j_diet_cola: ["双倍标签"],
+  j_drivers_license: ["3"],
+  j_erosion: ["4", "0", "52"],
+  j_gros_michel: ["15", "1", "6"],
+  j_idol: ["2", "指定点数", "指定花色"],
+  j_loyalty_card: ["4", "6", "计数随出牌变化"],
+  j_madness: ["0.5", "1"],
+  j_reserved_parking: ["1", "1", "2"],
+  j_stuntman: ["250", "2"],
+  j_troubadour: ["2", "1"],
+  j_yorick: ["1", "23", "0", "1"]
+};
+
+function unresolvedLabel(text) {
+  if (text.includes("花色")) return "指定花色";
+  if (text.includes("牌型") || text.includes("包含")) return "指定牌型";
+  if (text.includes("点数")) return "指定点数";
+  return "可变";
+}
+
 const descriptions = {};
 const entryRe = /(?:^|\n)\s*(j_[a-z0-9_]+)\s*=\s*\{/gi;
 let match;
@@ -69,11 +99,14 @@ while ((match = entryRe.exec(jokerBlock))) {
   const placeholderIds = [...new Set([...textBlock.matchAll(/#(\d+)#/g)].map(x => Number(x[1])))];
   const values = {};
   if (textBlock.includes("#1#/#2#")) ["1", ...center.numbers].forEach((v, i) => values[i + 1] = v);
-  else if (placeholderIds.length === 1 && center.numbers.length === 1) values[placeholderIds[0]] = center.numbers[0];
+  else center.numbers.slice(0, placeholderIds.length).forEach((v, i) => values[[...placeholderIds].sort((a, b) => a - b)[i]] = v);
+  if (valueOverrides[key]) valueOverrides[key].forEach((v, i) => values[i + 1] = v);
   const lines = [...textBlock.matchAll(/"((?:\\.|[^"\\])*)"/g)].map(x => {
     let text = JSON.parse('"' + x[1].replace(/\r?\n/g, "\\n") + '"');
     text = text.replace(/\{[^}]*\}/g, "");
-    text = text.replace(/#(\d+)#/g, (_, n) => values[Number(n)] ?? "…");
+    if (/当前/.test(text) && [...text.matchAll(/#(\d+)#/g)].some(m => values[Number(m[1])] === undefined))
+      return "（当前值随对局变化）";
+    text = text.replace(/#(\d+)#/g, (_, n) => values[Number(n)] ?? unresolvedLabel(textBlock));
     return text.trim();
   }).filter(Boolean);
   descriptions[aliases[key] || center.name] = lines;
