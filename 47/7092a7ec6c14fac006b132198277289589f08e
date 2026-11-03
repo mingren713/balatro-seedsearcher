@@ -1,0 +1,33 @@
+test-edition-needs.js
+  s_a121d7fbc2aaf8::t_13a3bc0344fda3 54-59,83,89,92-93,95,98,101-103
+index.html
+  s_a121d7fbc2aaf8::t_6caf273dfcc4b8 2321
+  s_a121d7fbc2aaf8::t_09912dcee65111 2328-2330,2344
+  s_a121d7fbc2aaf8::t_70a0906ff0250c 149,162-163,1552-1553,1558,1596,1606
+  s_a121d7fbc2aaf8::t_ac0ecd8f3b8d8e 923,947-962
+  s_a121d7fbc2aaf8::t_c07c45ce2ffd33 2160,2163-2165,2175-2182,2185,2188-2189,2194-2195
+  s_a121d7fbc2aaf8::t_433ba365b67587 312-314
+  s_a121d7fbc2aaf8::t_6625fa63826f93 929-930,935,973,983
+  s_a121d7fbc2aaf8::t_c551384e959829 1817-1827
+  s_a121d7fbc2aaf8::t_6bcc41bcc7bb53 2090-2092
+  s_a121d7fbc2aaf8::t_8fcd5f6c03c7b2 1813
+  s_a121d7fbc2aaf8::t_b439a00d83d713 1803
+  s_a121d7fbc2aaf8::t_a4aac1a8c74004 1546,1570-1585,2020
+  s_a121d7fbc2aaf8::t_fe94e1d8757aa0 1874,1915-1918,1974,1994
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "477092a7ec6c14fac006b132198277289589f08e",
+  "prompts": {},
+  "sessions": {
+    "s_a121d7fbc2aaf8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16286-66ac-7940-b08e-10507d3a977c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "mingren713 <1317114058@qq.com>"
+    }
+  }
+}
