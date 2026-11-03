@@ -229,6 +229,21 @@
   }
   .pcard:active{transform:translateY(4px);box-shadow:0 0 0 var(--ink)}
   .pname{font-size:13px;color:var(--dim);line-height:1.25;text-align:center;word-break:break-all}
+  #jhover{
+    display:none;position:fixed;z-index:101;pointer-events:none;
+    width:min(310px,calc(100vw - 24px));padding:11px 13px;
+    color:var(--ink);background:var(--panel);border:2px solid var(--gold);
+    border-radius:9px;box-shadow:0 7px 0 rgba(0,0,0,.3);
+    font-size:14px;line-height:1.55;
+  }
+  #jhover .jt{color:var(--gold);font-size:16px;font-weight:800}
+  #jhover .jr{margin-left:7px;color:var(--dim);font-size:12px}
+  #jhover .jd{margin-top:6px}
+  #jhover .touch-note{display:none;margin-top:7px;color:var(--green);font-size:12px}
+  @media (hover:none){
+    #jhover{left:12px!important;right:12px!important;top:auto!important;bottom:12px;width:auto}
+    #jhover .touch-note{display:block}
+  }
 
   button,.face,.pcard,.i{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
   button:focus{outline:none}
@@ -324,6 +339,7 @@
     <button id="pclose">关闭</button>
   </div>
   <div id="pgrid"></div>
+  <div id="jhover" role="tooltip"></div>
 </div>
 
 <div id="tip"><div class="tip-in">
@@ -878,6 +894,7 @@ function matchFast(seed,plan){
 }
 </script>
 
+<script src="joker-descriptions.js"></script>
 <script>
 "use strict";
 const POOLS = {
@@ -1455,9 +1472,32 @@ function jokerChip(en,size){
   return '<span class="chip" style="width:'+size+'px;height:'+h+'px">'+inner+'</span>';
 }
 
-let pickTarget=null;
+let pickTarget=null,pickerPointer="mouse",touchArmed="";
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+}
+function showJokerTip(card){
+  const en=card.dataset.j,tip=$("jhover");
+  const lines=(window.JOKER_DESCRIPTIONS&&window.JOKER_DESCRIPTIONS[en])||["功能说明暂缺"];
+  tip.innerHTML='<span class="jt">'+escapeHtml(jname(en))+'</span>'+
+    '<span class="jr">'+escapeHtml(RAR[RAR_OF[en]]||"")+'</span>'+
+    '<div class="jd">'+lines.map(escapeHtml).join("<br>")+'</div>'+
+    '<div class="touch-note">再次轻触这张牌即可选择</div>';
+  tip.style.display="block";
+  const rect=card.getBoundingClientRect(),tw=tip.offsetWidth,th=tip.offsetHeight;
+  let left=rect.right+10,top=rect.top;
+  if(left+tw>innerWidth-8)left=rect.left-tw-10;
+  if(left<8)left=Math.max(8,(innerWidth-tw)/2);
+  if(top+th>innerHeight-8)top=innerHeight-th-8;
+  tip.style.left=Math.round(left)+"px";
+  tip.style.top=Math.max(8,Math.round(top))+"px";
+}
+function hideJokerTip(){
+  const tip=$("jhover");if(tip)tip.style.display="none";
+}
 function openPicker(target){
   pickTarget=target;
+  touchArmed="";hideJokerTip();
   const box=$("picker"), grid=$("pgrid");
   if(!grid.dataset.built){
     const order=[[4,"传奇"],[3,"稀有"],[2,"罕见"],[1,"普通"]];
@@ -1465,14 +1505,29 @@ function openPicker(target){
     for(const [r,label] of order){
       html+='<div class="pgroup">'+label+'</div><div class="prow">';
       html+=POOLS[r].map(en=>
-        '<button class="pcard" data-j="'+en+'" title="'+jname(en)+'">'+
+        '<button class="pcard" data-j="'+en+'" aria-label="'+jname(en)+'">'+
         jokerChip(en,66)+'<span class="pname">'+jname(en)+'</span></button>').join("");
       html+='</div>';
     }
     grid.innerHTML=html;
     grid.dataset.built="1";
+    grid.onpointerdown=e=>{pickerPointer=e.pointerType||"mouse";};
+    grid.onpointerover=e=>{
+      const b=e.target.closest(".pcard");
+      if(b&&e.pointerType!=="touch")showJokerTip(b);
+    };
+    grid.onpointerout=e=>{
+      const b=e.target.closest(".pcard");
+      if(b&&(!e.relatedTarget||!b.contains(e.relatedTarget)))hideJokerTip();
+    };
+    grid.onfocusin=e=>{const b=e.target.closest(".pcard");if(b)showJokerTip(b);};
+    grid.onfocusout=e=>{if(e.target.closest(".pcard"))hideJokerTip();};
     grid.onclick=e=>{
       const b=e.target.closest(".pcard"); if(!b)return;
+      const isTouch=pickerPointer==="touch"||pickerPointer==="pen";
+      if(isTouch&&touchArmed!==b.dataset.j){
+        touchArmed=b.dataset.j;showJokerTip(b);return;
+      }
       const sel=pickTarget.querySelector("select.j");
       sel.value=b.dataset.j;
       pickTarget.querySelector(".face").innerHTML=
@@ -1485,10 +1540,11 @@ function openPicker(target){
   [...grid.querySelectorAll(".pgroup")].forEach(c=>c.style.display="");
   box.style.display="flex";
 }
-function closePicker(){$("picker").style.display="none";}
+function closePicker(){hideJokerTip();touchArmed="";$("picker").style.display="none";}
 
 function filterPicker(q){
   q=q.trim().toLowerCase();
+  hideJokerTip();touchArmed="";
   const grid=$("pgrid");
   [...grid.querySelectorAll(".pcard")].forEach(c=>{
     const en=c.dataset.j.toLowerCase(), cn=jname(c.dataset.j);

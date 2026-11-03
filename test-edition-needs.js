@@ -1,14 +1,30 @@
 const fs = require("node:fs");
 
 const html = fs.readFileSync("index.html", "utf8");
+const descriptionSource = fs.readFileSync("joker-descriptions.js", "utf8");
+const descriptionWindow = {};
+new Function("window", descriptionSource)(descriptionWindow);
+const jokerDescriptions = descriptionWindow.JOKER_DESCRIPTIONS;
+if (!jokerDescriptions || Object.keys(jokerDescriptions).length !== 150)
+  throw new Error("all 150 Joker descriptions should be embedded");
+if (!jokerDescriptions.Blueprint.join("").includes("复制") ||
+    !jokerDescriptions["Hanging Chad"].join("").includes("2"))
+  throw new Error("embedded Joker descriptions should contain localized effects and values");
 const engineMatch = html.match(/<script type="text\/plain" id="engine-src">([\s\S]*?)<\/script>/);
 if (!engineMatch) throw new Error("engine-src script not found");
+const descriptionPools = new Function(engineMatch[1] + ";return POOLS;")();
+const missingDescriptions = Object.values(descriptionPools).flat().filter(name => !jokerDescriptions[name]);
+if (missingDescriptions.length)
+  throw new Error("missing Joker descriptions: " + missingDescriptions.join(", "));
+if (/\{[A-Z]:|#\d+#/.test(JSON.stringify(jokerDescriptions)))
+  throw new Error("Joker descriptions should not expose localization markup or placeholders");
 
 const executableScripts = [...html.matchAll(/<script(?![^>]*text\/plain)[^>]*>([\s\S]*?)<\/script>/g)];
 for (const [, source] of executableScripts) new Function(source);
 new Function(engineMatch[1]);
 
-const executableEngine = executableScripts[0][1];
+const executableEngine = executableScripts.map(match => match[1]).find(source => source.includes("const POOLS ="));
+if (!executableEngine) throw new Error("main-thread engine script not found");
 const engineStart = executableEngine.indexOf("const POOLS =");
 const engineEnd = executableEngine.indexOf("const CN=");
 if (engineStart < 0 || engineEnd < 0 ||
@@ -32,6 +48,9 @@ if (!html.includes('id="separate-packs"'))
   throw new Error("different-Buffoon-pack control should be present");
 if (!html.includes('id="peek-antes"') || !html.includes("小盲跳过"))
   throw new Error("seed analysis should expose per-ante skip tags");
+if (!html.includes('id="jhover"') || !html.includes("showJokerTip") ||
+    !html.includes("再次轻触这张牌即可选择"))
+  throw new Error("Joker picker should expose mouse and touch effect previews");
 
 const tests = `
   const tagCalls = [];
@@ -160,4 +179,4 @@ const tests = `
 `;
 
 new Function(engineMatch[1] + tests)();
-console.log("OK: page scripts compile; non-Perishable, exact fast filtering, skip tags, Soul, stickers, aggregate editions, and pack separation pass");
+console.log("OK: page scripts compile; 150 hover descriptions, touch previews, non-Perishable, exact fast filtering, skip tags, Soul, stickers, aggregate editions, and pack separation pass");
