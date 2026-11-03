@@ -146,7 +146,7 @@
     background:transparent;color:var(--dim);box-shadow:none;clip-path:none;
   }
   .want .del:active{transform:none;color:var(--red)}
-  .spectral-want{display:grid;grid-template-columns:minmax(140px,240px) 64px 34px;gap:7px;align-items:center;margin-top:7px}
+  .spectral-want{display:grid;grid-template-columns:minmax(140px,240px) 88px 64px 34px;gap:7px;align-items:center;margin-top:7px}
   .spectral-want select,.spectral-want input{padding:7px 6px;font-size:15px}
   .or-row{margin-top:6px}
   .or-row button{width:auto;margin:0;padding:3px 12px;font-size:14px;
@@ -159,6 +159,8 @@
     .edition-needs{grid-template-columns:repeat(2,1fr)}
     .want{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 52px 30px}
     .want .face{grid-column:1 / -1}
+    .spectral-want{grid-template-columns:minmax(0,1fr) 64px 34px}
+    .spectral-want .face{grid-column:1 / -1}
   }
 
   .face{
@@ -306,6 +308,9 @@
   </label>
   <label style="display:flex;align-items:center;gap:7px;margin-top:8px;color:var(--dim);font-size:13px;cursor:pointer">
     <input type="checkbox" id="ghost-deck" style="width:auto;margin:0;clip-path:none"> 使用幽灵牌组（商店会出售幻灵牌）
+  </label>
+  <label style="display:flex;align-items:center;gap:7px;margin-top:8px;color:var(--dim);font-size:13px;cursor:pointer">
+    <input type="checkbox" id="omen-globe" style="width:auto;margin:0;clip-path:none"> 已购买预兆球（奇术包可能出现幻灵牌）
   </label>
   <div style="margin-top:12px;color:var(--chip);font-size:15px">
     <div style="display:flex;align-items:center;gap:8px">已经满足的条件（对应小丑不再锁）<span class="i" data-tip="gold">i</span></div>
@@ -915,19 +920,19 @@ function matchFast(seed,plan){
 }
 
 /* 幻灵牌搜索：普通牌组查卡包；幽灵牌组还会查商店。 */
-function matchSpectrals(seed,wants,slots,withPacks,ghostDeck){
+function matchSpectrals(seed,wants,slots,withPacks,ghostDeck,omenGlobe){
   if(!wants||!wants.length)return [];
   const needed=new Set(wants.map(w=>w.name));
   const maxAnte=Math.max(...wants.map(w=>w.ante));
   const run=_shared.reset(seed),events=[];
   let firstPack=false;
-  const add=(name,ante,from)=>{if(needed.has(name))events.push({kind:"spectral",name,ante,from});};
-  if(ghostDeck)add("Hex",1,"幽灵牌组初始");
+  const add=(name,ante,from,source)=>{if(needed.has(name))events.push({kind:"spectral",name,ante,from,source});};
+  if(ghostDeck)add("Hex",1,"幽灵牌组初始","start");
   for(let ante=1;ante<=maxAnte;ante++){
     if(ghostDeck){
       for(let slot=1;slot<=slots;slot++){
         const t=run.rand("cdt"+ante)*30;
-        if(t>=28)add(run.choice("Spectralsho"+ante,SPECTRALS),ante,"商店第 "+slot+" 位");
+        if(t>=28)add(run.choice("Spectralsho"+ante,SPECTRALS),ante,"商店第 "+slot+" 位","shop");
       }
     }
     if(!withPacks)continue;
@@ -939,9 +944,22 @@ function matchSpectrals(seed,wants,slots,withPacks,ghostDeck){
       if(pack==="RETRY")continue;
       const info=packInfo(pack);
       if(info.kind==="Arcana Pack"){
-        if(!needed.has("The Soul"))continue;
-        for(let k=0;k<info.size;k++)
-          if(run.rand("soul_Tarot"+ante)>0.997){add("The Soul",ante,packName(pack));break;}
+        if(!omenGlobe&&!needed.has("The Soul"))continue;
+        const locked=new Set(GATED_JOKERS);
+        let soulDone=false,holeDone=false;
+        for(let k=0;k<info.size;k++){
+          if(omenGlobe&&run.rand("omen_globe")>0.8){
+            const isSoul=!soulDone&&run.rand("soul_Spectral"+ante)>0.997;
+            const isHole=!holeDone&&run.rand("soul_Spectral"+ante)>0.997;
+            let name;
+            if(isHole){name="Black Hole";holeDone=true;}
+            else if(isSoul){name="The Soul";soulDone=true;}
+            else name=run.choice("Spectralar2"+ante,SPECTRALS,locked);
+            locked.add(name);add(name,ante,packName(pack),"pack");
+          }else if(!soulDone&&run.rand("soul_Tarot"+ante)>0.997){
+            soulDone=true;add("The Soul",ante,packName(pack),"pack");
+          }
+        }
       }else if(info.kind==="Spectral Pack"){
         const locked=new Set(GATED_JOKERS);
         let soulDone=false,holeDone=false;
@@ -952,7 +970,7 @@ function matchSpectrals(seed,wants,slots,withPacks,ghostDeck){
           if(isHole){name="Black Hole";holeDone=true;}
           else if(isSoul){name="The Soul";soulDone=true;}
           else name=run.choice("Spectral"+"spe"+ante,SPECTRALS,locked);
-          locked.add(name);add(name,ante,packName(pack));
+          locked.add(name);add(name,ante,packName(pack),"pack");
         }
       }
     }
@@ -962,7 +980,7 @@ function matchSpectrals(seed,wants,slots,withPacks,ghostDeck){
     if(i===wants.length)return true;
     for(let j=0;j<events.length;j++){
       const e=events[j],w=wants[i];
-      if(!used.has(j)&&e.name===w.name&&e.ante<=w.ante){
+      if(!used.has(j)&&e.name===w.name&&e.ante<=w.ante&&(!w.source||e.source===w.source)){
         used.add(j);out[i]=e;
         if(search(i+1))return true;
         used.delete(j);
@@ -1525,19 +1543,19 @@ function matchFast(seed,plan){
 }
 
 /* 幻灵牌搜索：普通牌组查卡包；幽灵牌组还会查商店。 */
-function matchSpectrals(seed,wants,slots,withPacks,ghostDeck){
+function matchSpectrals(seed,wants,slots,withPacks,ghostDeck,omenGlobe){
   if(!wants||!wants.length)return [];
   const needed=new Set(wants.map(w=>w.name));
   const maxAnte=Math.max(...wants.map(w=>w.ante));
   const run=_shared.reset(seed),events=[];
   let firstPack=false;
-  const add=(name,ante,from)=>{if(needed.has(name))events.push({kind:"spectral",name,ante,from});};
-  if(ghostDeck)add("Hex",1,"幽灵牌组初始");
+  const add=(name,ante,from,source)=>{if(needed.has(name))events.push({kind:"spectral",name,ante,from,source});};
+  if(ghostDeck)add("Hex",1,"幽灵牌组初始","start");
   for(let ante=1;ante<=maxAnte;ante++){
     if(ghostDeck){
       for(let slot=1;slot<=slots;slot++){
         const t=run.rand("cdt"+ante)*30;
-        if(t>=28)add(run.choice("Spectralsho"+ante,SPECTRALS),ante,"商店第 "+slot+" 位");
+        if(t>=28)add(run.choice("Spectralsho"+ante,SPECTRALS),ante,"商店第 "+slot+" 位","shop");
       }
     }
     if(!withPacks)continue;
@@ -1549,9 +1567,22 @@ function matchSpectrals(seed,wants,slots,withPacks,ghostDeck){
       if(pack==="RETRY")continue;
       const info=packInfo(pack);
       if(info.kind==="Arcana Pack"){
-        if(!needed.has("The Soul"))continue;
-        for(let k=0;k<info.size;k++)
-          if(run.rand("soul_Tarot"+ante)>0.997){add("The Soul",ante,packName(pack));break;}
+        if(!omenGlobe&&!needed.has("The Soul"))continue;
+        const locked=new Set(GATED_JOKERS);
+        let soulDone=false,holeDone=false;
+        for(let k=0;k<info.size;k++){
+          if(omenGlobe&&run.rand("omen_globe")>0.8){
+            const isSoul=!soulDone&&run.rand("soul_Spectral"+ante)>0.997;
+            const isHole=!holeDone&&run.rand("soul_Spectral"+ante)>0.997;
+            let name;
+            if(isHole){name="Black Hole";holeDone=true;}
+            else if(isSoul){name="The Soul";soulDone=true;}
+            else name=run.choice("Spectralar2"+ante,SPECTRALS,locked);
+            locked.add(name);add(name,ante,packName(pack),"pack");
+          }else if(!soulDone&&run.rand("soul_Tarot"+ante)>0.997){
+            soulDone=true;add("The Soul",ante,packName(pack),"pack");
+          }
+        }
       }else if(info.kind==="Spectral Pack"){
         const locked=new Set(GATED_JOKERS);
         let soulDone=false,holeDone=false;
@@ -1562,7 +1593,7 @@ function matchSpectrals(seed,wants,slots,withPacks,ghostDeck){
           if(isHole){name="Black Hole";holeDone=true;}
           else if(isSoul){name="The Soul";soulDone=true;}
           else name=run.choice("Spectral"+"spe"+ante,SPECTRALS,locked);
-          locked.add(name);add(name,ante,packName(pack));
+          locked.add(name);add(name,ante,packName(pack),"pack");
         }
       }
     }
@@ -1572,7 +1603,7 @@ function matchSpectrals(seed,wants,slots,withPacks,ghostDeck){
     if(i===wants.length)return true;
     for(let j=0;j<events.length;j++){
       const e=events[j],w=wants[i];
-      if(!used.has(j)&&e.name===w.name&&e.ante<=w.ante){
+      if(!used.has(j)&&e.name===w.name&&e.ante<=w.ante&&(!w.source||e.source===w.source)){
         used.add(j);out[i]=e;
         if(search(i+1))return true;
         used.delete(j);
@@ -1769,6 +1800,7 @@ function addSpectralWant(en,ante){
   row.innerHTML='<div class="face">'+spectralChip(en,44)+'<span class="fname">'+spectralName(en)+'</span></div>'+
     '<select class="sj" style="display:none">'+SPECTRAL_DATA.map(c=>
     '<option value="'+c.en+'"'+(c.en===en?" selected":"")+'>'+c.cn+'</option>').join("")+'</select>'+
+    '<select class="ssource"><option value="">不限来源</option><option value="shop">仅商店</option><option value="pack">仅卡包</option></select>'+
     '<input class="sant" type="number" min="1" value="'+(ante||4)+'" title="最晚出现底注">'+
     '<button class="del">×</button>';
   row.querySelector(".face").onclick=()=>openSpectralPicker(row);
@@ -1778,8 +1810,20 @@ function addSpectralWant(en,ante){
 function readSpectralWants(){
   return [...document.querySelectorAll("#spectral-wants .spectral-want")].map(row=>({
     name:row.querySelector(".sj").value,
+    source:row.querySelector(".ssource").value,
     ante:parseInt(row.querySelector(".sant").value,10)||8
   }));
+}
+function spectralSettingsError(wants,withPacks,ghostDeck){
+  if(wants.some(w=>w.source==="shop"&&(w.name==="The Soul"||w.name==="Black Hole")))
+    return "灵魂和黑洞不会在商店直接出售，请把来源改为卡包或不限。";
+  if(wants.some(w=>w.source==="shop")&&!ghostDeck)
+    return "仅商店的幻灵牌条件需要勾选幽灵牌组。";
+  if(wants.some(w=>w.source==="pack")&&!withPacks)
+    return "仅卡包的幻灵牌条件需要勾选“连卡包里的一起搜”。";
+  if(wants.some(w=>!w.source)&&!withPacks&&!ghostDeck)
+    return "幻灵牌需要来自卡包，或勾选幽灵牌组从商店搜索。";
+  return "";
 }
 $("add-spectral").onclick=()=>addSpectralWant("Familiar",4);
 
@@ -1827,7 +1871,7 @@ onmessage = function(e){
     var seed=seedFromIndex(d.start+i);
     var m=plan?matchFast(seed,plan):[];
     if(m&&d.spectralWants.length){
-      var sm=matchSpectrals(seed,d.spectralWants,d.slots,d.withPacks,d.ghostDeck);
+      var sm=matchSpectrals(seed,d.spectralWants,d.slots,d.withPacks,d.ghostDeck,d.omenGlobe);
       m=sm?m.concat(sm):null;
     }
     if(m) hits.push({seed:seed,where:m});
@@ -1868,8 +1912,10 @@ $("go").onclick=()=>{
   const target=Math.max(1,parseInt($("found").value,10)||5);
   const withPacks=$("packs").checked;
   const ghostDeck=$("ghost-deck").checked;
-  if(spectralWants.length&&!withPacks&&!ghostDeck){
-    $("stat").textContent="幻灵牌需要来自卡包，或勾选幽灵牌组从商店搜索。";
+  const omenGlobe=$("omen-globe").checked;
+  const spectralError=spectralSettingsError(spectralWants,withPacks,ghostDeck);
+  if(spectralError){
+    $("stat").textContent=spectralError;
     return;
   }
   const maxAnte=Math.max(1,...groups.flat().map(w=>w.ante),...spectralWants.map(w=>w.ante));
@@ -1925,7 +1971,7 @@ $("go").onclick=()=>{
         if(!running||hits>=target){ if(pool.every(x=>x.idle))finish(); return; }
         w.idle=false;
         const start=cursor;cursor+=CHUNK;
-        w.postMessage({start,count:CHUNK,groups,spectralWants,slots,maxAnte,withPacks,ghostDeck,editionNeeds,stickerMode,separatePacks,unlocks:readUnlocks()});
+        w.postMessage({start,count:CHUNK,groups,spectralWants,slots,maxAnte,withPacks,ghostDeck,omenGlobe,editionNeeds,stickerMode,separatePacks,unlocks:readUnlocks()});
       };
       w.onmessage=ev=>{
         tried+=ev.data.tried;
@@ -1945,7 +1991,7 @@ $("go").onclick=()=>{
           const seed=seedFromIndex(cursor++);tried++;
           let m=plan?matchFast(seed,plan):[];
           if(m&&spectralWants.length){
-            const sm=matchSpectrals(seed,spectralWants,slots,withPacks,ghostDeck);
+            const sm=matchSpectrals(seed,spectralWants,slots,withPacks,ghostDeck,omenGlobe);
             m=sm?m.concat(sm):null;
           }
           if(m)report(seed,m);
@@ -1971,7 +2017,7 @@ const TIPS={
   stop:"找到这么多个种子后自动停下。<br><br>想多攒几个就调大，只要一个能玩的就填 1。",
   gold:"有几张小丑开局是锁着的，抽到了会被换掉：<br>金票要牌组里有黄金牌，钢铁小丑要钢铁牌，石头小丑要石头牌，幸运猫要幸运牌，玻璃小丑要玻璃牌，卡文迪什要大麦克香蕉灭绝过。<br><br>打对应流派时勾上，它们才搜得到。勾了“大麦克灭绝”以后，大麦克香蕉本身就不会再出现了。<br><br>注意：勾上后是从底注 1 第一个位置起就算已经满足，太早出现的那几张实战里可能还拿不到。",
   packs:"勾上以后，卡包里开出的小丑和幻灵牌都算数。<br><br><b>搜传奇必须勾着</b>，因为灵魂牌只出现在奇术包和幻灵包里。",
-  spectral:"可以指定一张或多张幻灵牌，名称和说明直接取自当前游戏的简体中文本地化。<br><br>普通牌组搜索幻灵包；灵魂也会搜索奇术包。勾选幽灵牌组后，还会按商店位搜索可直接购买的普通幻灵牌。灵魂和黑洞不会在幽灵牌组商店中直接出售。旁边数字表示最晚出现底注。",
+  spectral:"可以指定一张或多张幻灵牌，并分别限定为仅商店、仅卡包或不限来源。名称和说明直接取自当前游戏的简体中文本地化。<br><br>普通牌组搜索幻灵包；灵魂也会搜索奇术包。勾选幽灵牌组后，还会按商店位搜索可直接购买的普通幻灵牌。<br><br>预兆球不会让商店出售幻灵牌，它的实际效果是让奇术包中的每个位置有20%概率改为幻灵牌；勾选对应选项后会纳入搜索与估算。灵魂和黑洞不会在商店中直接出售。旁边数字表示最晚出现底注。",
   from:"种子是按顺序一个个试过去的。<br><br>留空就随机挑个起点开始数；填一个种子则从它往后接着数。"+
        "上次搜到一半关掉了，把下面显示的“数到这里了”填进来就能续上。",
   edtotal:"这里限制的是所有独立条件最终命中的小丑合计版本，不绑定到具体名字。<br><br>例如添加蓝图、头脑风暴、男爵三个条件，把多彩填 1、负片填 1，就表示三张都要出现，而且其中任意一张是多彩、任意另一张是负片。<br><br>每张小丑最多只有一个版本，所以四项数量之和不能超过独立条件数量。",
@@ -2041,7 +2087,9 @@ function describeGroups(groups){
   }).join(" ＋ ");
 }
 function describeSpectralWants(wants){
-  return wants.map(w=>spectralName(w.name)+" ≤底注"+w.ante).join(" ＋ ");
+  const sourceName={shop:"商店",pack:"卡包"};
+  return wants.map(w=>spectralName(w.name)+(w.source?"（"+sourceName[w.source]+"）":"")+
+    " ≤底注"+w.ante).join(" ＋ ");
 }
 function readGroups(){
   return [...document.querySelectorAll("#wants .wantgroup")].map(grp=>
@@ -2109,11 +2157,12 @@ function spectralPackStats(size){
   }
   return _SPECTRAL_PACK_STATS[size]=out;
 }
-function spectralLambdaPerAnte(w,ante,slots,withPacks,ghostDeck){
+function spectralLambdaPerAnte(w,ante,slots,withPacks,ghostDeck,omenGlobe){
   let lam=0;
   const ordinary=w.name!=="The Soul"&&w.name!=="Black Hole";
-  if(ghostDeck&&ordinary)lam+=slots*(2/30)*(1/16);
-  if(!withPacks)return lam;
+  const allowShop=!w.source||w.source==="shop",allowPack=!w.source||w.source==="pack";
+  if(allowShop&&ghostDeck&&ordinary)lam+=slots*(2/30)*(1/16);
+  if(!allowPack||!withPacks)return lam;
   const offers=ante===1?3:6; /* 第一底注第一个卡包固定为小丑包 */
   for(const [pack,size] of [["Spectral Pack",2],["Jumbo Spectral Pack",4],["Mega Spectral Pack",4]]){
     const stats=spectralPackStats(size),pp=packP(pack);
@@ -2123,20 +2172,27 @@ function spectralLambdaPerAnte(w,ante,slots,withPacks,ghostDeck){
   }
   if(w.name==="The Soul")
     for(const [pack,size] of [["Arcana Pack",3],["Jumbo Arcana Pack",5],["Mega Arcana Pack",5]])
-      lam+=offers*packP(pack)*(1-Math.pow(.997,size));
+      lam+=offers*packP(pack)*(1-Math.pow(omenGlobe?0.9970018:.997,size));
+  if(omenGlobe){
+    for(const [pack,size] of [["Arcana Pack",3],["Jumbo Arcana Pack",5],["Mega Arcana Pack",5]]){
+      const pp=offers*packP(pack);
+      if(ordinary)lam+=pp*size*0.2*0.994009/16;
+      else if(w.name==="Black Hole")lam+=pp*(1-Math.pow(1-0.2*0.003,size));
+    }
+  }
   return lam;
 }
-function spectralEstimate(wants,slots,withPacks,ghostDeck){
+function spectralEstimate(wants,slots,withPacks,ghostDeck,omenGlobe){
   const buckets=[];
   for(const w of wants){
-    const b=buckets.find(x=>x.name===w.name&&x.ante===w.ante);
-    if(b)b.k++;else buckets.push({name:w.name,ante:w.ante,k:1});
+    const b=buckets.find(x=>x.name===w.name&&x.ante===w.ante&&x.source===w.source);
+    if(b)b.k++;else buckets.push({name:w.name,ante:w.ante,source:w.source,k:1});
   }
   let p=1;
   for(const b of buckets){
     let lam=0;
-    for(let ante=1;ante<=b.ante;ante++)lam+=spectralLambdaPerAnte(b,ante,slots,withPacks,ghostDeck);
-    const guaranteed=ghostDeck&&b.name==="Hex"&&b.ante>=1?1:0;
+    for(let ante=1;ante<=b.ante;ante++)lam+=spectralLambdaPerAnte(b,ante,slots,withPacks,ghostDeck,omenGlobe);
+    const guaranteed=ghostDeck&&b.name==="Hex"&&b.ante>=1&&!b.source?1:0;
     const need=Math.max(0,b.k-guaranteed);
     if(!need)continue;
     if(lam<=0)return 0;
@@ -2262,14 +2318,16 @@ $("est").onclick=()=>{
   const slots=parseInt($("slots").value,10)||0;
   const withPacks=$("packs").checked;
   const ghostDeck=$("ghost-deck").checked;
+  const omenGlobe=$("omen-globe").checked;
   const separatePacks=$("separate-packs").checked;
   const stickerMode=$("sticker-mode").value;
   setUnlocks(readUnlocks());
   const box=$("odds");
   box.style.display="block";
 
-  if(spectralWants.length&&!withPacks&&!ghostDeck){
-    box.innerHTML='<span class="lv lv-hard">搜不到</span>幻灵牌需要来自卡包，或勾选幽灵牌组从商店搜索。';
+  const spectralError=spectralSettingsError(spectralWants,withPacks,ghostDeck);
+  if(spectralError){
+    box.innerHTML='<span class="lv lv-hard">搜不到</span>'+spectralError;
     return;
   }
 
@@ -2283,7 +2341,7 @@ $("est").onclick=()=>{
   }
 
   const jokerP=groups.length?estimate(groups,slots,withPacks,editionNeeds,stickerMode):1;
-  const spectralP=spectralEstimate(spectralWants,slots,withPacks,ghostDeck);
+  const spectralP=spectralEstimate(spectralWants,slots,withPacks,ghostDeck,omenGlobe);
   const p=jokerP*spectralP;
   const cores=Math.min(navigator.hardwareConcurrency||4,8);
   const speed=(spectralWants.length?9000:14000)*cores*0.85;

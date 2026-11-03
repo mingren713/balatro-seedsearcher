@@ -51,9 +51,12 @@ const probabilityApi = new Function(engineMatch[1] + executableEngine.slice(prob
 const packStats = probabilityApi.spectralPackStats(4);
 if (!(packStats.normal > 3.9 && packStats.normal < 4 && packStats.soul > 0 && packStats.hole > 0))
   throw new Error("Spectral pack probability states should include normal and hidden cards");
-if (probabilityApi.spectralEstimate([{name:"Hex",ante:1}], 0, false, true) !== 1 ||
-    probabilityApi.spectralEstimate([{name:"The Soul",ante:4}], 8, false, true) !== 0 ||
-    !(probabilityApi.spectralEstimate([{name:"Sigil",ante:4}], 8, true, false) > 0))
+if (probabilityApi.spectralEstimate([{name:"Hex",ante:1}], 0, false, true, false) !== 1 ||
+    probabilityApi.spectralEstimate([{name:"The Soul",ante:4}], 8, false, true, false) !== 0 ||
+    probabilityApi.spectralEstimate([{name:"Sigil",ante:4,source:"shop"}], 8, true, false, false) !== 0 ||
+    !(probabilityApi.spectralEstimate([{name:"Sigil",ante:4,source:"shop"}], 8, false, true, false) > 0) ||
+    !(probabilityApi.spectralEstimate([{name:"Sigil",ante:4,source:"pack"}], 8, true, false, true) >
+      probabilityApi.spectralEstimate([{name:"Sigil",ante:4,source:"pack"}], 8, true, false, false)))
   throw new Error("Spectral estimate should include Ghost Deck start, shops, and packs");
 
 if (!html.includes('✦ 灵魂牌 → '))
@@ -77,22 +80,27 @@ if (!html.includes('id="jhover"') || !html.includes("showJokerTip") ||
     !html.includes("再次轻触这张牌即可选择"))
   throw new Error("Joker picker should expose mouse and touch effect previews");
 if (!html.includes('id="spectral-wants"') || !html.includes('id="ghost-deck"') ||
+    !html.includes('id="omen-globe"') || !html.includes('class="ssource"') ||
     !html.includes('id="spicker"') || !html.includes("image/Tarots.png") ||
     !html.includes("matchSpectrals") || !html.includes("spectralEstimate"))
   throw new Error("Spectral image picking, estimating, packs, and Ghost Deck shops should be available");
 
 const tests = `
-  const ghostSigil = matchSpectrals("AAAAAAAK", [{name:"Sigil",ante:4}], 8, false, true);
+  const ghostSigil = matchSpectrals("AAAAAAAK", [{name:"Sigil",ante:4,source:"shop"}], 8, false, true, false);
   if (!ghostSigil || ghostSigil[0].ante !== 1 || ghostSigil[0].from !== "商店第 7 位")
     throw new Error("Ghost Deck shops should search ordinary Spectral cards");
-  if (matchSpectrals("AAAAAAAK", [{name:"Sigil",ante:4}], 8, false, false))
+  if (matchSpectrals("AAAAAAAK", [{name:"Sigil",ante:4,source:"shop"}], 8, false, false, false) ||
+      matchSpectrals("AAAAAAAK", [{name:"Sigil",ante:4,source:"pack"}], 8, false, true, false))
     throw new Error("ordinary decks should not sell Spectral cards in the shop");
-  const startingHex = matchSpectrals("AAAAAAAA", [{name:"Hex",ante:1}], 0, false, true);
+  const startingHex = matchSpectrals("AAAAAAAA", [{name:"Hex",ante:1}], 0, false, true, false);
   if (!startingHex || startingHex[0].from !== "幽灵牌组初始")
     throw new Error("Ghost Deck should include its guaranteed starting Hex");
-  const packSoul = matchSpectrals("LIWEE829", [{name:"The Soul",ante:3}], 0, true, false);
+  const packSoul = matchSpectrals("LIWEE829", [{name:"The Soul",ante:3,source:"pack"}], 0, true, false, false);
   if (!packSoul || packSoul[0].ante !== 3 || packSoul[0].from !== "幻灵包")
     throw new Error("Spectral conditions should include hidden cards from packs");
+  const omenSigil = matchSpectrals("AAAAAAAE", [{name:"Sigil",ante:1,source:"pack"}], 0, true, false, true);
+  if (!omenSigil || omenSigil[0].from !== "奇术包")
+    throw new Error("Omen Globe should add ordinary Spectral cards to Arcana Packs");
 
   const tagCalls = [];
   const tagMock = {choice(key,pool,locked){tagCalls.push({key,pool,locked});return pool[0];}};
