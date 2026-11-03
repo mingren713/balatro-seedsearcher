@@ -138,15 +138,20 @@
     background:var(--panel-lite);clip-path:var(--cut-sm);
     padding:9px 9px 6px;margin-top:10px;
   }
+  #spectral-wants:not(:empty){
+    background:var(--panel-lite);clip-path:var(--cut-sm);
+    padding:9px 9px 6px;margin-top:10px;
+  }
   .want{display:grid;grid-template-columns:minmax(0,1fr) 84px 68px 52px 30px;gap:6px;align-items:center;margin-top:5px}
   .want:first-child{margin-top:0}
   .want select,.want input{padding:7px 6px;font-size:15px}
-  .want .del{
+  .want .del,.spectral-want .del{
     width:30px;margin:0;padding:6px 0;font-size:17px;
     background:transparent;color:var(--dim);box-shadow:none;clip-path:none;
   }
-  .want .del:active{transform:none;color:var(--red)}
-  .spectral-want{display:grid;grid-template-columns:minmax(140px,240px) 88px 64px 34px;gap:7px;align-items:center;margin-top:7px}
+  .want .del:active,.spectral-want .del:active{transform:none;color:var(--red)}
+  .spectral-want{display:grid;grid-template-columns:minmax(0,1fr) 158px 52px 30px;gap:6px;align-items:center;margin-top:5px}
+  .spectral-want:first-child{margin-top:0}
   .spectral-want select,.spectral-want input{padding:7px 6px;font-size:15px}
   .or-row{margin-top:6px}
   .or-row button{width:auto;margin:0;padding:3px 12px;font-size:14px;
@@ -159,8 +164,9 @@
     .edition-needs{grid-template-columns:repeat(2,1fr)}
     .want{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 52px 30px}
     .want .face{grid-column:1 / -1}
-    .spectral-want{grid-template-columns:minmax(0,1fr) 64px 34px}
+    .spectral-want{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 52px 30px}
     .spectral-want .face{grid-column:1 / -1}
+    .spectral-want .ssource{grid-column:1 / 3}
   }
 
   .face{
