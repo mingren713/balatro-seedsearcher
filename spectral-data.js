@@ -10,6 +10,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "随机增强的人头牌",
       "到手牌中"
     ],
+    "pos": [
+      0,
+      4
+    ],
     "order": 1
   },
   {
@@ -21,6 +25,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "并添加2张",
       "随机增强的A",
       "到手牌中"
+    ],
+    "pos": [
+      1,
+      4
     ],
     "order": 2
   },
@@ -34,6 +42,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "随机增强的数字牌",
       "到手牌中"
     ],
+    "pos": [
+      2,
+      4
+    ],
     "order": 3
   },
   {
@@ -44,6 +56,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "将金色蜡封添加到",
       "1张选定的",
       "手牌中"
+    ],
+    "pos": [
+      3,
+      4
     ],
     "order": 4
   },
@@ -56,6 +72,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "闪箔卡、镭射卡、或多彩卡",
       "效果中的一种"
     ],
+    "pos": [
+      4,
+      4
+    ],
     "order": 5
   },
   {
@@ -67,6 +87,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "稀有小丑牌",
       "将资金变为$0"
     ],
+    "pos": [
+      5,
+      4
+    ],
     "order": 6
   },
   {
@@ -77,6 +101,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "将手中所有",
       "卡牌转换为同一种",
       "随机花色"
+    ],
+    "pos": [
+      6,
+      4
     ],
     "order": 7
   },
@@ -90,6 +118,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "随机点数",
       "手牌上限-1"
     ],
+    "pos": [
+      7,
+      4
+    ],
     "order": 8
   },
   {
@@ -100,6 +132,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "添加负片效果到",
       "一张随机的小丑牌",
       "手牌上限-1"
+    ],
+    "pos": [
+      8,
+      4
     ],
     "order": 9
   },
@@ -112,6 +148,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "5张手牌",
       "获得$20"
     ],
+    "pos": [
+      9,
+      4
+    ],
     "order": 10
   },
   {
@@ -122,6 +162,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "随机复制一张",
       "小丑牌，摧毁",
       "其他小丑牌"
+    ],
+    "pos": [
+      0,
+      5
     ],
     "order": 11
   },
@@ -134,6 +178,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "1张所选卡牌",
       "加上红色蜡封"
     ],
+    "pos": [
+      1,
+      5
+    ],
     "order": 12
   },
   {
@@ -144,6 +192,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "随机为一张小丑牌添加",
       "多彩，摧毁",
       "其他小丑牌"
+    ],
+    "pos": [
+      2,
+      5
     ],
     "order": 13
   },
@@ -156,6 +208,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "1张所选卡牌",
       "加上蓝色蜡封"
     ],
+    "pos": [
+      3,
+      5
+    ],
     "order": 14
   },
   {
@@ -167,6 +223,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "1张所选卡牌",
       "加上紫色蜡封"
     ],
+    "pos": [
+      4,
+      5
+    ],
     "order": 15
   },
   {
@@ -176,6 +236,10 @@ window.SPECTRAL_CARDS=Object.freeze([
     "lines": [
       "选定手牌中的1张牌",
       "生成2张其复制牌"
+    ],
+    "pos": [
+      5,
+      5
     ],
     "order": 16
   },
@@ -188,6 +252,10 @@ window.SPECTRAL_CARDS=Object.freeze([
       "传奇小丑牌",
       "（必须有空位）"
     ],
+    "pos": [
+      2,
+      2
+    ],
     "order": 17
   },
   {
@@ -197,6 +265,10 @@ window.SPECTRAL_CARDS=Object.freeze([
     "lines": [
       "所有牌型",
       "提升1级"
+    ],
+    "pos": [
+      9,
+      3
     ],
     "order": 18
   }

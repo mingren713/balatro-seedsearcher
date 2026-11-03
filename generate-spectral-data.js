@@ -34,13 +34,16 @@ const centers = new Map();
 for (const line of game.split(/\r?\n/)) {
   const match = line.match(/^\s*(c_[a-z0-9_]+)\s*=.*?\border\s*=\s*(\d+).*?\bname\s*=\s*["']([^"']+)["'].*?\bset\s*=\s*["']Spectral["']/i);
   if (!match) continue;
+  const posMatch = line.match(/\bpos\s*=\s*\{\s*x\s*=\s*(\d+)\s*,\s*y\s*=\s*(\d+)/i);
   const configAt = line.indexOf("config", match.index);
   let numbers = [];
   if (configAt >= 0) {
     const config = braceBlock(line, configAt);
     numbers = [...config.matchAll(/=\s*(-?\d+(?:\.\d+)?)/g)].map(x => x[1]);
   }
-  centers.set(match[1], {order:Number(match[2]), name:match[3], numbers});
+  if (!posMatch) throw new Error(`sprite position missing for ${match[1]}`);
+  centers.set(match[1], {order:Number(match[2]), name:match[3], numbers,
+    pos:[Number(posMatch[1]), Number(posMatch[2])]});
 }
 
 const cards = [];
@@ -61,7 +64,8 @@ while ((match = entryRe.exec(block))) {
     text = text.replace(/#(\d+)#/g, (_, n) => values[Number(n) - 1] ?? "随对局变化");
     return text.trim();
   }).filter(Boolean);
-  cards.push({key, en:center.name, cn:JSON.parse('"' + nameMatch[1] + '"'), lines, order:center.order});
+  cards.push({key, en:center.name, cn:JSON.parse('"' + nameMatch[1] + '"'), lines,
+    pos:center.pos, order:center.order});
 }
 cards.sort((a, b) => a.order - b.order);
 if (cards.length !== 18) throw new Error(`expected 18 Spectral cards, got ${cards.length}`);

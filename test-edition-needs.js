@@ -25,9 +25,10 @@ if (JSON.stringify(jokerDescriptions).includes("…"))
   throw new Error("Joker descriptions should explain variable values instead of showing ellipses");
 if (!spectralCards || spectralCards.length !== 18 ||
     spectralCards.find(c => c.en === "Sigil")?.cn !== "符印" ||
-    !spectralCards.find(c => c.en === "Ouija")?.lines.join("").includes("随机点数"))
+    !spectralCards.find(c => c.en === "Ouija")?.lines.join("").includes("随机点数") ||
+    spectralCards.find(c => c.en === "Black Hole")?.pos.join(",") !== "9,3")
   throw new Error("all Spectral names and effects should come from the game localization");
-if (!html.includes("background:#fffdf5") || !html.includes("#jhover .jd{margin-top:6px;color:#17201f}"))
+if (!html.includes("background:#fffdf5") || !html.includes("#jhover .jd,#shover .jd{margin-top:6px;color:#17201f}"))
   throw new Error("Joker hover cards should use a light background with dark description text");
 
 const executableScripts = [...html.matchAll(/<script(?![^>]*text\/plain)[^>]*>([\s\S]*?)<\/script>/g)];
@@ -41,6 +42,19 @@ const engineEnd = executableEngine.indexOf("const CN=");
 if (engineStart < 0 || engineEnd < 0 ||
     executableEngine.slice(engineStart, engineEnd).trim() !== engineMatch[1].trim())
   throw new Error("worker and main-thread engine copies should stay identical");
+const probabilityStart = executableEngine.indexOf("const PACK_TOTAL=");
+const probabilityEnd = executableEngine.indexOf("function stickerProbability", probabilityStart);
+if (probabilityStart < 0 || probabilityEnd < 0)
+  throw new Error("Spectral probability estimator source not found");
+const probabilityApi = new Function(engineMatch[1] + executableEngine.slice(probabilityStart, probabilityEnd) +
+  ";return {spectralPackStats,spectralEstimate};")();
+const packStats = probabilityApi.spectralPackStats(4);
+if (!(packStats.normal > 3.9 && packStats.normal < 4 && packStats.soul > 0 && packStats.hole > 0))
+  throw new Error("Spectral pack probability states should include normal and hidden cards");
+if (probabilityApi.spectralEstimate([{name:"Hex",ante:1}], 0, false, true) !== 1 ||
+    probabilityApi.spectralEstimate([{name:"The Soul",ante:4}], 8, false, true) !== 0 ||
+    !(probabilityApi.spectralEstimate([{name:"Sigil",ante:4}], 8, true, false) > 0))
+  throw new Error("Spectral estimate should include Ghost Deck start, shops, and packs");
 
 if (!html.includes('✦ 灵魂牌 → '))
   throw new Error("seed analysis should label Soul cards explicitly");
@@ -63,8 +77,9 @@ if (!html.includes('id="jhover"') || !html.includes("showJokerTip") ||
     !html.includes("再次轻触这张牌即可选择"))
   throw new Error("Joker picker should expose mouse and touch effect previews");
 if (!html.includes('id="spectral-wants"') || !html.includes('id="ghost-deck"') ||
-    !html.includes("matchSpectrals"))
-  throw new Error("Spectral pack and Ghost Deck shop searching should be available");
+    !html.includes('id="spicker"') || !html.includes("image/Tarots.png") ||
+    !html.includes("matchSpectrals") || !html.includes("spectralEstimate"))
+  throw new Error("Spectral image picking, estimating, packs, and Ghost Deck shops should be available");
 
 const tests = `
   const ghostSigil = matchSpectrals("AAAAAAAK", [{name:"Sigil",ante:4}], 8, false, true);
@@ -205,4 +220,4 @@ const tests = `
 `;
 
 new Function(engineMatch[1] + tests)();
-console.log("OK: page scripts compile; 150 Joker and 18 localized Spectral descriptions, Ghost Deck shops, packs, exact filtering, tags, Soul, stickers, aggregate editions, and pack separation pass");
+console.log("OK: page scripts compile; 150 Joker and 18 localized Spectral descriptions, Spectral sprites and estimates, Ghost Deck shops, packs, exact filtering, tags, Soul, stickers, aggregate editions, and pack separation pass");
