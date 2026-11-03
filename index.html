@@ -146,6 +146,9 @@
     background:transparent;color:var(--dim);box-shadow:none;clip-path:none;
   }
   .want .del:active{transform:none;color:var(--red)}
+  .spectral-want{display:grid;grid-template-columns:minmax(140px,190px) 64px 34px;gap:7px;align-items:start;margin-top:7px}
+  .spectral-want select,.spectral-want input{padding:7px 6px;font-size:15px}
+  .spectral-want .sdesc{grid-column:1 / -1;margin-top:-2px;padding:8px 10px;color:#17201f;background:#fffdf5;border:1px solid #d08b16;border-radius:7px;font-size:13px;line-height:1.55}
   .or-row{margin-top:6px}
   .or-row button{width:auto;margin:0;padding:3px 12px;font-size:14px;
     background:var(--green);box-shadow:0 4px 0 var(--green-dk)}
@@ -260,6 +263,12 @@
   <button class="ghost" id="add">+ 增加条件</button>
 
   <div style="margin-top:16px;color:var(--chip);font-size:15px">
+    <div style="display:flex;align-items:center;gap:8px">指定幻灵牌<span class="i" data-tip="spectral">i</span></div>
+    <div id="spectral-wants"></div>
+    <button class="ghost" id="add-spectral" style="margin-top:8px">+ 增加幻灵牌</button>
+  </div>
+
+  <div style="margin-top:16px;color:var(--chip);font-size:15px">
     <div style="display:flex;align-items:center;gap:8px">这些条件合计至少包含<span class="i" data-tip="edtotal">i</span></div>
     <div class="edition-needs">
       <label>负片<input id="need-neg" type="number" min="0" value="0"></label>
@@ -295,6 +304,9 @@
   </div>
   <label style="display:flex;align-items:center;gap:7px;margin-top:8px;color:var(--dim);font-size:13px;cursor:pointer">
     <input type="checkbox" id="separate-packs" style="width:auto;margin:0;clip-path:none"> 目标小丑不能来自同一个小丑包
+  </label>
+  <label style="display:flex;align-items:center;gap:7px;margin-top:8px;color:var(--dim);font-size:13px;cursor:pointer">
+    <input type="checkbox" id="ghost-deck" style="width:auto;margin:0;clip-path:none"> 使用幽灵牌组（商店会出售幻灵牌）
   </label>
   <div style="margin-top:12px;color:var(--chip);font-size:15px">
     <div style="display:flex;align-items:center;gap:8px">已经满足的条件（对应小丑不再锁）<span class="i" data-tip="gold">i</span></div>
@@ -539,9 +551,10 @@ function nextTag(run,ante){
 function anteTags(run,ante){return {small:nextTag(run,ante),big:nextTag(run,ante)};}
 
 /* 商店第 n 个位置卖什么 */
-function shopSlot(run,ante,stickerMode){
-  const t=run.rand("cdt"+ante)*28;
+function shopSlot(run,ante,stickerMode,ghostDeck){
+  const t=run.rand("cdt"+ante)*(ghostDeck?30:28);
   /* 商店的消耗牌不 soulable（create_card 第六个参数没传），永远不会翻灵魂牌 */
+  if(t>=28&&ghostDeck)return {type:"spectral",name:run.choice("Spectralsho"+ante,SPECTRALS)};
   if(t>=20) return {type:t<24?"塔罗牌":"星球牌"};
   const r=run.rand("rarity"+ante+"sho");
   const rarity=r>0.95?3:(r>0.7?2:1);
@@ -661,12 +674,12 @@ function antePacks(run,ante,state,stickerMode){
 }
 
 const _shared=new Run("AAAAAAAA");
-function scanSeed(seed,antes,slots,withPacks,stickerMode){
+function scanSeed(seed,antes,slots,withPacks,stickerMode,ghostDeck){
   const run=_shared.reset(seed);
   const found=[];const st={};
   for(let a=1;a<=antes;a++){
     for(let s=1;s<=slots;s++){
-      const it=shopSlot(run,a,stickerMode);
+      const it=shopSlot(run,a,stickerMode,ghostDeck);
       if(it.type==="joker")found.push({name:it.name,ante:a,slot:s,
         edition:it.edition,sticker:it.sticker,soul:it.soul,from:"商店第 "+s+" 位"});
     }
@@ -724,15 +737,15 @@ function matchCandidates(got,groups,editionNeeds,separatePacks){
   };
   return search(0)?out:null;
 }
-function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks){
-  return matchCandidates(scanSeed(seed,maxAnte,slots,withPacks,stickerMode),groups,editionNeeds,separatePacks);
+function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks,ghostDeck){
+  return matchCandidates(scanSeed(seed,maxAnte,slots,withPacks,stickerMode,ghostDeck),groups,editionNeeds,separatePacks);
 }
 
 /* ===== 快速通道：只算条件用得上的东西，用来快速排除 ===== */
 const RAR_OF={};
 for(const r of [1,2,3,4]) for(const j of POOLS[r]) RAR_OF[j]=r;
 
-function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks){
+function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks,ghostDeck){
   const needRar=new Set();
   let needLeg=false;
   const allWants=[];
@@ -757,7 +770,7 @@ function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separa
     if(g.every(w=>RAR_OF[w.name]===4))legGroups.push(i);
     for(const w of g) if(RAR_OF[w.name]===4) legMax=Math.max(legMax,w.ante);
   });
-  return {needRar,needLeg,needNames,needEditions,needStickers,needExact,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks};
+  return {needRar,needLeg,needNames,needEditions,needStickers,needExact,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks,ghostDeck};
 }
 
 /* 每个底注用到的 key 编号，第一次用到时登记 */
@@ -841,7 +854,7 @@ function fastScan(seed,plan,exact){
     if(needRar.size){
       const K=fk(a);
       for(let s=1;s<=slots;s++){
-        const t=run.randId(K.cdt)*28;
+        const t=run.randId(K.cdt)*(plan.ghostDeck?30:28);
         if(t<20){
           const r=run.randId(K.rSho);
           const rar=r>0.95?3:(r>0.7?2:1);
@@ -890,11 +903,71 @@ function fastScan(seed,plan,exact){
 /* 对外：快速通道已经确认全部约束后，完整版只负责生成展示结果 */
 function matchFast(seed,plan){
   if(!fastScan(seed,plan))return null;
-  return matchSeed(seed,plan.groups,plan.slots,plan.maxAnte,plan.withPacks,plan.editionNeeds,plan.stickerMode,plan.separatePacks);
+  return matchSeed(seed,plan.groups,plan.slots,plan.maxAnte,plan.withPacks,plan.editionNeeds,plan.stickerMode,plan.separatePacks,plan.ghostDeck);
+}
+
+/* 幻灵牌搜索：普通牌组查卡包；幽灵牌组还会查商店。 */
+function matchSpectrals(seed,wants,slots,withPacks,ghostDeck){
+  if(!wants||!wants.length)return [];
+  const needed=new Set(wants.map(w=>w.name));
+  const maxAnte=Math.max(...wants.map(w=>w.ante));
+  const run=_shared.reset(seed),events=[];
+  let firstPack=false;
+  const add=(name,ante,from)=>{if(needed.has(name))events.push({kind:"spectral",name,ante,from});};
+  if(ghostDeck)add("Hex",1,"幽灵牌组初始");
+  for(let ante=1;ante<=maxAnte;ante++){
+    if(ghostDeck){
+      for(let slot=1;slot<=slots;slot++){
+        const t=run.rand("cdt"+ante)*30;
+        if(t>=28)add(run.choice("Spectralsho"+ante,SPECTRALS),ante,"商店第 "+slot+" 位");
+      }
+    }
+    if(!withPacks)continue;
+    const n=ante===1?4:6;
+    for(let pi=0;pi<n;pi++){
+      let pack;
+      if(ante<=2&&!firstPack){firstPack=true;pack="Buffoon Pack";}
+      else pack=run.weighted("shop_pack"+ante,PACKS);
+      if(pack==="RETRY")continue;
+      const info=packInfo(pack);
+      if(info.kind==="Arcana Pack"){
+        if(!needed.has("The Soul"))continue;
+        for(let k=0;k<info.size;k++)
+          if(run.rand("soul_Tarot"+ante)>0.997){add("The Soul",ante,packName(pack));break;}
+      }else if(info.kind==="Spectral Pack"){
+        const locked=new Set(GATED_JOKERS);
+        let soulDone=false,holeDone=false;
+        for(let k=0;k<info.size;k++){
+          const isSoul=!soulDone&&run.rand("soul_Spectral"+ante)>0.997;
+          const isHole=!holeDone&&run.rand("soul_Spectral"+ante)>0.997;
+          let name;
+          if(isHole){name="Black Hole";holeDone=true;}
+          else if(isSoul){name="The Soul";soulDone=true;}
+          else name=run.choice("Spectral"+"spe"+ante,SPECTRALS,locked);
+          locked.add(name);add(name,ante,packName(pack));
+        }
+      }
+    }
+  }
+  const out=new Array(wants.length),used=new Set();
+  const search=i=>{
+    if(i===wants.length)return true;
+    for(let j=0;j<events.length;j++){
+      const e=events[j],w=wants[i];
+      if(!used.has(j)&&e.name===w.name&&e.ante<=w.ante){
+        used.add(j);out[i]=e;
+        if(search(i+1))return true;
+        used.delete(j);
+      }
+    }
+    return false;
+  };
+  return search(0)?out:null;
 }
 </script>
 
 <script src="joker-descriptions.js"></script>
+<script src="spectral-data.js"></script>
 <script>
 "use strict";
 const POOLS = {
@@ -1088,9 +1161,10 @@ function nextTag(run,ante){
 function anteTags(run,ante){return {small:nextTag(run,ante),big:nextTag(run,ante)};}
 
 /* 商店第 n 个位置卖什么 */
-function shopSlot(run,ante,stickerMode){
-  const t=run.rand("cdt"+ante)*28;
+function shopSlot(run,ante,stickerMode,ghostDeck){
+  const t=run.rand("cdt"+ante)*(ghostDeck?30:28);
   /* 商店的消耗牌不 soulable（create_card 第六个参数没传），永远不会翻灵魂牌 */
+  if(t>=28&&ghostDeck)return {type:"spectral",name:run.choice("Spectralsho"+ante,SPECTRALS)};
   if(t>=20) return {type:t<24?"塔罗牌":"星球牌"};
   const r=run.rand("rarity"+ante+"sho");
   const rarity=r>0.95?3:(r>0.7?2:1);
@@ -1210,12 +1284,12 @@ function antePacks(run,ante,state,stickerMode){
 }
 
 const _shared=new Run("AAAAAAAA");
-function scanSeed(seed,antes,slots,withPacks,stickerMode){
+function scanSeed(seed,antes,slots,withPacks,stickerMode,ghostDeck){
   const run=_shared.reset(seed);
   const found=[];const st={};
   for(let a=1;a<=antes;a++){
     for(let s=1;s<=slots;s++){
-      const it=shopSlot(run,a,stickerMode);
+      const it=shopSlot(run,a,stickerMode,ghostDeck);
       if(it.type==="joker")found.push({name:it.name,ante:a,slot:s,
         edition:it.edition,sticker:it.sticker,soul:it.soul,from:"商店第 "+s+" 位"});
     }
@@ -1273,15 +1347,15 @@ function matchCandidates(got,groups,editionNeeds,separatePacks){
   };
   return search(0)?out:null;
 }
-function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks){
-  return matchCandidates(scanSeed(seed,maxAnte,slots,withPacks,stickerMode),groups,editionNeeds,separatePacks);
+function matchSeed(seed,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks,ghostDeck){
+  return matchCandidates(scanSeed(seed,maxAnte,slots,withPacks,stickerMode,ghostDeck),groups,editionNeeds,separatePacks);
 }
 
 /* ===== 快速通道：只算条件用得上的东西，用来快速排除 ===== */
 const RAR_OF={};
 for(const r of [1,2,3,4]) for(const j of POOLS[r]) RAR_OF[j]=r;
 
-function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks){
+function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks,ghostDeck){
   const needRar=new Set();
   let needLeg=false;
   const allWants=[];
@@ -1306,7 +1380,7 @@ function makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separa
     if(g.every(w=>RAR_OF[w.name]===4))legGroups.push(i);
     for(const w of g) if(RAR_OF[w.name]===4) legMax=Math.max(legMax,w.ante);
   });
-  return {needRar,needLeg,needNames,needEditions,needStickers,needExact,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks};
+  return {needRar,needLeg,needNames,needEditions,needStickers,needExact,groups,gmax,legGroups,legMax,deadline,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks,ghostDeck};
 }
 
 /* 每个底注用到的 key 编号，第一次用到时登记 */
@@ -1390,7 +1464,7 @@ function fastScan(seed,plan,exact){
     if(needRar.size){
       const K=fk(a);
       for(let s=1;s<=slots;s++){
-        const t=run.randId(K.cdt)*28;
+        const t=run.randId(K.cdt)*(plan.ghostDeck?30:28);
         if(t<20){
           const r=run.randId(K.rSho);
           const rar=r>0.95?3:(r>0.7?2:1);
@@ -1439,7 +1513,66 @@ function fastScan(seed,plan,exact){
 /* 对外：快速通道已经确认全部约束后，完整版只负责生成展示结果 */
 function matchFast(seed,plan){
   if(!fastScan(seed,plan))return null;
-  return matchSeed(seed,plan.groups,plan.slots,plan.maxAnte,plan.withPacks,plan.editionNeeds,plan.stickerMode,plan.separatePacks);
+  return matchSeed(seed,plan.groups,plan.slots,plan.maxAnte,plan.withPacks,plan.editionNeeds,plan.stickerMode,plan.separatePacks,plan.ghostDeck);
+}
+
+/* 幻灵牌搜索：普通牌组查卡包；幽灵牌组还会查商店。 */
+function matchSpectrals(seed,wants,slots,withPacks,ghostDeck){
+  if(!wants||!wants.length)return [];
+  const needed=new Set(wants.map(w=>w.name));
+  const maxAnte=Math.max(...wants.map(w=>w.ante));
+  const run=_shared.reset(seed),events=[];
+  let firstPack=false;
+  const add=(name,ante,from)=>{if(needed.has(name))events.push({kind:"spectral",name,ante,from});};
+  if(ghostDeck)add("Hex",1,"幽灵牌组初始");
+  for(let ante=1;ante<=maxAnte;ante++){
+    if(ghostDeck){
+      for(let slot=1;slot<=slots;slot++){
+        const t=run.rand("cdt"+ante)*30;
+        if(t>=28)add(run.choice("Spectralsho"+ante,SPECTRALS),ante,"商店第 "+slot+" 位");
+      }
+    }
+    if(!withPacks)continue;
+    const n=ante===1?4:6;
+    for(let pi=0;pi<n;pi++){
+      let pack;
+      if(ante<=2&&!firstPack){firstPack=true;pack="Buffoon Pack";}
+      else pack=run.weighted("shop_pack"+ante,PACKS);
+      if(pack==="RETRY")continue;
+      const info=packInfo(pack);
+      if(info.kind==="Arcana Pack"){
+        if(!needed.has("The Soul"))continue;
+        for(let k=0;k<info.size;k++)
+          if(run.rand("soul_Tarot"+ante)>0.997){add("The Soul",ante,packName(pack));break;}
+      }else if(info.kind==="Spectral Pack"){
+        const locked=new Set(GATED_JOKERS);
+        let soulDone=false,holeDone=false;
+        for(let k=0;k<info.size;k++){
+          const isSoul=!soulDone&&run.rand("soul_Spectral"+ante)>0.997;
+          const isHole=!holeDone&&run.rand("soul_Spectral"+ante)>0.997;
+          let name;
+          if(isHole){name="Black Hole";holeDone=true;}
+          else if(isSoul){name="The Soul";soulDone=true;}
+          else name=run.choice("Spectral"+"spe"+ante,SPECTRALS,locked);
+          locked.add(name);add(name,ante,packName(pack));
+        }
+      }
+    }
+  }
+  const out=new Array(wants.length),used=new Set();
+  const search=i=>{
+    if(i===wants.length)return true;
+    for(let j=0;j<events.length;j++){
+      const e=events[j],w=wants[i];
+      if(!used.has(j)&&e.name===w.name&&e.ante<=w.ante){
+        used.add(j);out[i]=e;
+        if(search(i+1))return true;
+        used.delete(j);
+      }
+    }
+    return false;
+  };
+  return search(0)?out:null;
 }
 
 const CN={"Joker": "小丑", "Greedy Joker": "贪婪小丑", "Lusty Joker": "色欲小丑", "Wrathful Joker": "愤怒小丑", "Gluttonous Joker": "暴食小丑", "Jolly Joker": "开心小丑", "Zany Joker": "古怪小丑", "Mad Joker": "疯狂小丑", "Crazy Joker": "狂野小丑", "Droll Joker": "滑稽小丑", "Sly Joker": "奸诈小丑", "Wily Joker": "狡猾小丑", "Clever Joker": "聪敏小丑", "Devious Joker": "阴险小丑", "Crafty Joker": "精明小丑", "Half Joker": "半张小丑", "Credit Card": "信用卡", "Banner": "旗帜", "Mystic Summit": "神秘之峰", " 8 Ball": "八号球", "Misprint": "印错", "Raised Fist": "致胜之拳", "Chaos the Clown": "混沌小丑", "Scary Face": "恐怖面孔", "Abstract Joker": "抽象小丑", "Delayed Gratification": "延迟满足", "Gros Michel": "大麦克香蕉", "Even Steven": "偶数史蒂文", "Odd Todd": "奇数托德", "Scholar": "学者", "Business Card": "名片", "Supernova": "超新星", "Ride the Bus": "搭乘巴士", "Egg": "蛋", "Runner": "跑步选手", "Ice Cream": "冰淇淋", "Splash": "飞溅", "Blue Joker": "蓝色小丑", "Faceless Joker": "无面小丑", "Green Joker": "绿色小丑", "Superposition": "叠加态", "To Do List": "待办清单", "Cavendish": "卡文迪什", "Red Card": "红牌", "Square Joker": "方块小丑", "Riff raff": "乌合之众", "Photograph": "照片", "Reserved Parking": "私人车位", "Mail In Rebate": "邮件回扣", "Hallucination": "幻觉", "Fortune Teller": "占卜师", "Juggler": "杂耍师", "Drunkard": "醉汉", "Golden Joker": "黄金小丑", "Popcorn": "爆米花", "Walkie Talkie": "对讲机", "Smiley Face": "笑脸", "Golden Ticket": "金票", "Swashbuckler": "侠盗", "Hanging Chad": "未断选票", "Shoot the Moon": "射月", "Joker Stencil": "小丑模板", "Four Fingers": "四指", "Mime": "哑剧演员", "Ceremonial Dagger": "仪式匕首", "Marble Joker": "大理石小丑", "Loyalty Card": "会员卡", "Dusk": "黄昏", "Fibonacci": "斐波那契", "Steel Joker": "钢铁小丑", "Hack": "烂脱口秀演员", "Pareidolia": "幻视", "Space Joker": "太空小丑", "Burglar": "窃贼", "Blackboard": "黑板", "Sixth Sense": "第六感", "Constellation": "星座", "Hiker": "徒步者", "Card Sharp": "老千小丑", "Madness": "疯狂", "Seance": "通灵", "Vampire": "吸血鬼", "Shortcut": "捷径", "Hologram": "全息影像", "Cloud 9": "九霄云外", "Rocket": "火箭", "Midas Mask": "迈达斯面具", "Luchador": "摔角手", "Gift Card": "礼品卡", "Turtle Bean": "龟豆", "Erosion": "侵蚀", "To the Moon": "飞向月球", "Stone Joker": "石头小丑", "Lucky Cat": "幸运猫", "Bull": "公牛", "Diet Cola": "无糖可乐", "Trading Card": "交易卡", "Flash Card": "抽认卡", "Spare Trousers": "备用长裤", "Ramen": "拉面", "Seltzer": "苏打水", "Castle": "城堡", "Mr Bones": "骷髅先生", "Acrobat": "杂技演员", "Sock and Buskin": "悲与喜", "Troubadour": "吟游诗人", "Certificate": "证书", "Smeared Joker": "涂抹小丑", "Throwback": "复古", "Rough Gem": "原石", "Bloodstone": "血石", "Arrowhead": "箭头", "Onyx Agate": "缟玛瑙", "Glass Joker": "玻璃小丑", "Showman": "马戏团长", "Flower Pot": "花盆", "Merry Andy": "快乐安迪", "Oops All 6s": "六六大顺", "The Idol": "偶像", "Seeing Double": "重影", "Matador": "斗牛士", "Satellite": "卫星", "Cartomancer": "纸牌占卜师", "Astronomer": "天文学家", "Bootstraps": "提靴带", "DNA": "DNA", "Vagabond": "流浪汉", "Baron": "男爵", "Obelisk": "方尖碑", "Baseball Card": "棒球卡", "Ancient Joker": "古代小丑", "Campfire": "营火", "Blueprint": "蓝图", "Wee Joker": "小小丑", "Hit the Road": "上路吧杰克", "The Duo": "二重奏", "The Trio": "三重奏", "The Family": "一家人", "The Order": "秩序", "The Tribe": "部落", "Stuntman": "特技演员", "Invisible Joker": "隐形小丑", "Brainstorm": "头脑风暴", "Drivers License": "驾驶执照", "Burnt Joker": "烧焦小丑", "Canio": "卡尼奥", "Triboulet": "特里布莱", "Yorick": "约里克", "Chicot": "希科", "Perkeo": "帕奇欧"};
@@ -1558,6 +1691,32 @@ const ALL=[...POOLS[1],...POOLS[2],...POOLS[3],...POOLS[4]]
 const RAR={1:"普通",2:"罕见",3:"稀有",4:"传奇"};
 const $=id=>document.getElementById(id);
 const jname=en=>(CN[en]||en);
+const SPECTRAL_DATA=window.SPECTRAL_CARDS||[];
+const SPECTRAL_BY_NAME=Object.fromEntries(SPECTRAL_DATA.map(c=>[c.en,c]));
+const spectralName=en=>(SPECTRAL_BY_NAME[en]&&SPECTRAL_BY_NAME[en].cn)||en;
+
+function addSpectralWant(en,ante){
+  const row=document.createElement("div");
+  row.className="spectral-want";
+  row.innerHTML='<select class="sj">'+SPECTRAL_DATA.map(c=>
+    '<option value="'+c.en+'"'+(c.en===en?" selected":"")+'>'+c.cn+'</option>').join("")+'</select>'+
+    '<input class="sant" type="number" min="1" value="'+(ante||4)+'" title="最晚出现底注">'+
+    '<button class="del">×</button><div class="sdesc"></div>';
+  const render=()=>{
+    const c=SPECTRAL_BY_NAME[row.querySelector(".sj").value];
+    row.querySelector(".sdesc").innerHTML=c?c.lines.map(escapeHtml).join("<br>"):"";
+  };
+  row.querySelector(".sj").onchange=render;
+  row.querySelector(".del").onclick=()=>row.remove();
+  $("spectral-wants").appendChild(row);render();
+}
+function readSpectralWants(){
+  return [...document.querySelectorAll("#spectral-wants .spectral-want")].map(row=>({
+    name:row.querySelector(".sj").value,
+    ante:parseInt(row.querySelector(".sant").value,10)||8
+  }));
+}
+$("add-spectral").onclick=()=>addSpectralWant("Familiar",4);
 
 function makeRow(en,ante,ed,sticker){
   const d=document.createElement("div");
@@ -1598,10 +1757,14 @@ const WORKER_SRC = document.getElementById('engine-src').textContent + `
 onmessage = function(e){
   var d=e.data, hits=[];
   setUnlocks(d.unlocks);
-  var plan=makePlan(d.groups,d.slots,d.maxAnte,d.withPacks,d.editionNeeds,d.stickerMode,d.separatePacks);
+  var plan=d.groups.length?makePlan(d.groups,d.slots,d.maxAnte,d.withPacks,d.editionNeeds,d.stickerMode,d.separatePacks,d.ghostDeck):null;
   for(var i=0;i<d.count;i++){
     var seed=seedFromIndex(d.start+i);
-    var m=matchFast(seed,plan);
+    var m=plan?matchFast(seed,plan):[];
+    if(m&&d.spectralWants.length){
+      var sm=matchSpectrals(seed,d.spectralWants,d.slots,d.withPacks,d.ghostDeck);
+      m=sm?m.concat(sm):null;
+    }
     if(m) hits.push({seed:seed,where:m});
   }
   postMessage({tried:d.count,hits:hits});
@@ -1628,7 +1791,8 @@ $("go").onclick=()=>{
       ante:parseInt(d.querySelector(".ant").value,10)||8
     }))
   ).filter(g=>g.length);
-  if(!groups.length)return;
+  const spectralWants=readSpectralWants();
+  if(!groups.length&&!spectralWants.length)return;
   const editionNeeds=readEditionNeeds();
   const editionNeedTotal=Object.values(editionNeeds).reduce((a,b)=>a+b,0);
   if(editionNeedTotal>groups.length){
@@ -1637,8 +1801,13 @@ $("go").onclick=()=>{
   }
   const slots=parseInt($("slots").value,10)||6;
   const target=Math.max(1,parseInt($("found").value,10)||5);
-  const maxAnte=Math.max(...groups.flat().map(w=>w.ante));
   const withPacks=$("packs").checked;
+  const ghostDeck=$("ghost-deck").checked;
+  if(spectralWants.length&&!withPacks&&!ghostDeck){
+    $("stat").textContent="幻灵牌需要来自卡包，或勾选幽灵牌组从商店搜索。";
+    return;
+  }
+  const maxAnte=Math.max(1,...groups.flat().map(w=>w.ante),...spectralWants.map(w=>w.ante));
   const separatePacks=$("separate-packs").checked;
   const stickerMode=$("sticker-mode").value;
   if(groups.flat().some(w=>w.sticker==="永恒")&&stickerMode==="none"){
@@ -1665,7 +1834,8 @@ $("go").onclick=()=>{
   };
   const report=(seed,where)=>{
     hits++;
-    const txt=where.map(g=>jokerChip(g.name,26)+" "+jname(g.name)+" — 底注 "+g.ante+
+    const txt=where.map(g=>(g.kind==="spectral"?'✦ ':jokerChip(g.name,26)+" ")+
+      (g.kind==="spectral"?spectralName(g.name):jname(g.name))+" — 底注 "+g.ante+
       " ・ "+g.from+(g.edition?' <span class="ed">'+g.edition+"</span>":"")+
       (g.sticker?' <span class="st">'+g.sticker+"</span>":"")+
       (g.soul?" ✦灵魂牌":"")).join("<br>");
@@ -1690,7 +1860,7 @@ $("go").onclick=()=>{
         if(!running||hits>=target){ if(pool.every(x=>x.idle))finish(); return; }
         w.idle=false;
         const start=cursor;cursor+=CHUNK;
-        w.postMessage({start,count:CHUNK,groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks,unlocks:readUnlocks()});
+        w.postMessage({start,count:CHUNK,groups,spectralWants,slots,maxAnte,withPacks,ghostDeck,editionNeeds,stickerMode,separatePacks,unlocks:readUnlocks()});
       };
       w.onmessage=ev=>{
         tried+=ev.data.tried;
@@ -1705,10 +1875,14 @@ $("go").onclick=()=>{
     (async()=>{
       $("stat").textContent="这个浏览器不让开多线程，用单核跑…";
       while(running&&hits<target){
-        const plan=makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks);
+        const plan=groups.length?makePlan(groups,slots,maxAnte,withPacks,editionNeeds,stickerMode,separatePacks,ghostDeck):null;
         for(let n=0;n<3000&&running&&hits<target;n++){
           const seed=seedFromIndex(cursor++);tried++;
-          const m=matchFast(seed,plan);
+          let m=plan?matchFast(seed,plan):[];
+          if(m&&spectralWants.length){
+            const sm=matchSpectrals(seed,spectralWants,slots,withPacks,ghostDeck);
+            m=sm?m.concat(sm):null;
+          }
           if(m)report(seed,m);
         }
         show();
@@ -1731,7 +1905,8 @@ const TIPS={
        "填得越大搜得越慢，而且实战里翻到后面的位置要花钱重摇，不重掷不买券每底注只有6位。",
   stop:"找到这么多个种子后自动停下。<br><br>想多攒几个就调大，只要一个能玩的就填 1。",
   gold:"有几张小丑开局是锁着的，抽到了会被换掉：<br>金票要牌组里有黄金牌，钢铁小丑要钢铁牌，石头小丑要石头牌，幸运猫要幸运牌，玻璃小丑要玻璃牌，卡文迪什要大麦克香蕉灭绝过。<br><br>打对应流派时勾上，它们才搜得到。勾了“大麦克灭绝”以后，大麦克香蕉本身就不会再出现了。<br><br>注意：勾上后是从底注 1 第一个位置起就算已经满足，太早出现的那几张实战里可能还拿不到。",
-  packs:"勾上以后，卡包里开出的小丑也算数。<br><br><b>搜传奇必须勾着</b>，因为灵魂牌只出现在奇术包和幻灵包里。",
+  packs:"勾上以后，卡包里开出的小丑和幻灵牌都算数。<br><br><b>搜传奇必须勾着</b>，因为灵魂牌只出现在奇术包和幻灵包里。",
+  spectral:"可以指定一张或多张幻灵牌，名称和说明直接取自当前游戏的简体中文本地化。<br><br>普通牌组搜索幻灵包；灵魂也会搜索奇术包。勾选幽灵牌组后，还会按商店位搜索可直接购买的普通幻灵牌。灵魂和黑洞不会在幽灵牌组商店中直接出售。旁边数字表示最晚出现底注。",
   from:"种子是按顺序一个个试过去的。<br><br>留空就随机挑个起点开始数；填一个种子则从它往后接着数。"+
        "上次搜到一半关掉了，把下面显示的“数到这里了”填进来就能续上。",
   edtotal:"这里限制的是所有独立条件最终命中的小丑合计版本，不绑定到具体名字。<br><br>例如添加蓝图、头脑风暴、男爵三个条件，把多彩填 1、负片填 1，就表示三张都要出现，而且其中任意一张是多彩、任意另一张是负片。<br><br>每张小丑最多只有一个版本，所以四项数量之和不能超过独立条件数量。",
@@ -1799,6 +1974,9 @@ function describeGroups(groups){
     const a=Math.max(...g.map(w=>w.ante));
     return names+" ≤底注"+a;
   }).join(" ＋ ");
+}
+function describeSpectralWants(wants){
+  return wants.map(w=>spectralName(w.name)+" ≤底注"+w.ante).join(" ＋ ");
 }
 function readGroups(){
   return [...document.querySelectorAll("#wants .wantgroup")].map(grp=>
@@ -1944,7 +2122,14 @@ function estimate(groups,slots,withPacks,editionNeeds,stickerMode){
 
 $("est").onclick=()=>{
   const groups=readGroups();
-  if(!groups.length)return;
+  const spectralWants=readSpectralWants();
+  if(!groups.length&&!spectralWants.length)return;
+  if(!groups.length){
+    $("odds").style.display="block";
+    $("odds").innerHTML='<span class="lv lv-mid">直接搜索</span>'+describeSpectralWants(spectralWants)+
+      '<div style="margin-top:8px;color:var(--dim)">幻灵牌受卡包种类、包大小和隐藏牌判定共同影响，暂不提供容易误导的公式粗估。</div>';
+    return;
+  }
   const editionNeeds=readEditionNeeds();
   if(Object.values(editionNeeds).reduce((a,b)=>a+b,0)>groups.length){
     $("odds").style.display="block";
@@ -1989,13 +2174,15 @@ $("est").onclick=()=>{
   if(sec>1800)txt+='<br><span style="color:var(--dim)">太久的话，可以放宽条件，或用「+ 或者」多加几张备选。</span>';
 
   box.innerHTML='<span class="lv '+lv+'">'+lvName+'</span>'+describeGroups(groups)+describeEditionNeeds(editionNeeds)+
+    (spectralWants.length?' ＋ '+describeSpectralWants(spectralWants):'')+
     '<div style="margin-top:8px">'+txt+'</div>'+
+    (spectralWants.length?'<div style="margin-top:6px;color:var(--dim);font-size:13px">上面的概率尚未计入幻灵牌条件，实际会更难。</div>':'')+
     '<div style="margin-top:6px;color:var(--dim);font-size:13px">粗略估算，实际用时一般远小于估计</div>';
 };
 $("copyall").onclick=()=>{
   if(!allHits.length)return;
   const t=allHits.map(h=>
-    h.seed+"\n"+h.where.map(g=>"  "+jname(g.name)+(g.edition?"["+g.edition+"]":"")+
+    h.seed+"\n"+h.where.map(g=>"  "+(g.kind==="spectral"?spectralName(g.name):jname(g.name))+(g.edition?"["+g.edition+"]":"")+
       (g.sticker?"["+g.sticker+"]":"")+
       (g.soul?" ✦":"")+" — 底注"+g.ante+" "+g.from).join("\n")
   ).join("\n\n");
@@ -2013,6 +2200,7 @@ $("peek").onclick=()=>{
   if(!seed)return;
   setUnlocks(readUnlocks());
   const stickerMode=$("sticker-mode").value;
+  const ghostDeck=$("ghost-deck").checked;
   const peekAntes=Math.min(20,Math.max(1,parseInt($("peek-antes").value,10)||8));
   const run=new Run(seed);const _st={};
   let html="";const souls=[];
@@ -2020,11 +2208,12 @@ $("peek").onclick=()=>{
     const tags=anteTags(run,a);
     const items=[];
     for(let s=1;s<=8;s++){
-      const it=shopSlot(run,a,stickerMode);
+      const it=shopSlot(run,a,stickerMode,ghostDeck);
       items.push(it.type==="joker"
         ? jname(it.name)+'<span class="o">('+RAR[it.rarity]+(it.edition?"・"+it.edition:"")+
           (it.sticker?"・"+it.sticker:"")+
           (it.soul?"・灵魂":"")+")</span>"
+        : it.type==="spectral"?'<span class="soul-card">'+spectralName(it.name)+"</span>"
         : '<span class="o">'+it.type+"</span>");
     }
     html+='<div><span class="a">底注 '+a+'</span>　小盲跳过：<span class="tag">'+TAG_CN[tags.small]+
@@ -2032,6 +2221,7 @@ $("peek").onclick=()=>{
     html+='<div style="padding-left:14px"><span class="o">商店：</span>'+items.join("　")+"</div>";
     for(const p of antePacks(run,a,_st,stickerMode)){
       const cs=p.cards.map(c=>{
+        if(c.type==="spectral")return spectralName(c.name);
         if(c.type!=="joker")return c.name||"?";
         if(c.soul){
           souls.push({ante:a,pack:packName(p.pack),joker:jname(c.name),edition:c.edition});

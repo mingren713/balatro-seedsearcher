@@ -5,6 +5,9 @@ const descriptionSource = fs.readFileSync("joker-descriptions.js", "utf8");
 const descriptionWindow = {};
 new Function("window", descriptionSource)(descriptionWindow);
 const jokerDescriptions = descriptionWindow.JOKER_DESCRIPTIONS;
+const spectralSource = fs.readFileSync("spectral-data.js", "utf8");
+new Function("window", spectralSource)(descriptionWindow);
+const spectralCards = descriptionWindow.SPECTRAL_CARDS;
 if (!jokerDescriptions || Object.keys(jokerDescriptions).length !== 150)
   throw new Error("all 150 Joker descriptions should be embedded");
 if (!jokerDescriptions.Blueprint.join("").includes("复制") ||
@@ -20,6 +23,10 @@ if (/\{[A-Z]:|#\d+#/.test(JSON.stringify(jokerDescriptions)))
   throw new Error("Joker descriptions should not expose localization markup or placeholders");
 if (JSON.stringify(jokerDescriptions).includes("…"))
   throw new Error("Joker descriptions should explain variable values instead of showing ellipses");
+if (!spectralCards || spectralCards.length !== 18 ||
+    spectralCards.find(c => c.en === "Sigil")?.cn !== "符印" ||
+    !spectralCards.find(c => c.en === "Ouija")?.lines.join("").includes("随机点数"))
+  throw new Error("all Spectral names and effects should come from the game localization");
 if (!html.includes("background:#fffdf5") || !html.includes("#jhover .jd{margin-top:6px;color:#17201f}"))
   throw new Error("Joker hover cards should use a light background with dark description text");
 
@@ -55,8 +62,23 @@ if (!html.includes('id="peek-antes"') || !html.includes("小盲跳过"))
 if (!html.includes('id="jhover"') || !html.includes("showJokerTip") ||
     !html.includes("再次轻触这张牌即可选择"))
   throw new Error("Joker picker should expose mouse and touch effect previews");
+if (!html.includes('id="spectral-wants"') || !html.includes('id="ghost-deck"') ||
+    !html.includes("matchSpectrals"))
+  throw new Error("Spectral pack and Ghost Deck shop searching should be available");
 
 const tests = `
+  const ghostSigil = matchSpectrals("AAAAAAAK", [{name:"Sigil",ante:4}], 8, false, true);
+  if (!ghostSigil || ghostSigil[0].ante !== 1 || ghostSigil[0].from !== "商店第 7 位")
+    throw new Error("Ghost Deck shops should search ordinary Spectral cards");
+  if (matchSpectrals("AAAAAAAK", [{name:"Sigil",ante:4}], 8, false, false))
+    throw new Error("ordinary decks should not sell Spectral cards in the shop");
+  const startingHex = matchSpectrals("AAAAAAAA", [{name:"Hex",ante:1}], 0, false, true);
+  if (!startingHex || startingHex[0].from !== "幽灵牌组初始")
+    throw new Error("Ghost Deck should include its guaranteed starting Hex");
+  const packSoul = matchSpectrals("LIWEE829", [{name:"The Soul",ante:3}], 0, true, false);
+  if (!packSoul || packSoul[0].ante !== 3 || packSoul[0].from !== "幻灵包")
+    throw new Error("Spectral conditions should include hidden cards from packs");
+
   const tagCalls = [];
   const tagMock = {choice(key,pool,locked){tagCalls.push({key,pool,locked});return pool[0];}};
   const firstTags = anteTags(tagMock,1);
@@ -183,4 +205,4 @@ const tests = `
 `;
 
 new Function(engineMatch[1] + tests)();
-console.log("OK: page scripts compile; 150 hover descriptions, touch previews, non-Perishable, exact fast filtering, skip tags, Soul, stickers, aggregate editions, and pack separation pass");
+console.log("OK: page scripts compile; 150 Joker and 18 localized Spectral descriptions, Ghost Deck shops, packs, exact filtering, tags, Soul, stickers, aggregate editions, and pack separation pass");
