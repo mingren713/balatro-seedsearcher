@@ -1,0 +1,20 @@
+index.html
+  s_a121d7fbc2aaf8::t_1d2dbfd7fe29fb 148,152-153,167,169
+  s_a121d7fbc2aaf8::t_60eb515c3790f8 141-144,154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8bb4d29adef16cad19ad0f3574abfe1e2381b286",
+  "prompts": {},
+  "sessions": {
+    "s_a121d7fbc2aaf8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16286-66ac-7940-b08e-10507d3a977c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "mingren713 <1317114058@qq.com>"
+    }
+  }
+}
