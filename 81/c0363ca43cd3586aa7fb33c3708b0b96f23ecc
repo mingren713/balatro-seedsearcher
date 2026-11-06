@@ -1,0 +1,23 @@
+index.html
+  s_a121d7fbc2aaf8::t_b5a18a7bf30ef7 1750,2422
+spectral-data.js
+  s_a121d7fbc2aaf8::t_55c0a68e70428e 276-329
+generate-spectral-data.js
+  s_a121d7fbc2aaf8::t_0e6869bb6babd2 73-95,97-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "81c0363ca43cd3586aa7fb33c3708b0b96f23ecc",
+  "prompts": {},
+  "sessions": {
+    "s_a121d7fbc2aaf8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16286-66ac-7940-b08e-10507d3a977c",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "mingren713 <1317114058@qq.com>"
+    }
+  }
+}
