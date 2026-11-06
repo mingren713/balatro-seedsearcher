@@ -70,7 +70,31 @@ while ((match = entryRe.exec(block))) {
 cards.sort((a, b) => a.order - b.order);
 if (cards.length !== 18) throw new Error(`expected 18 Spectral cards, got ${cards.length}`);
 
+const consumableNames = Object.fromEntries(cards.map(c => [c.en, c.cn]));
+for (const kind of ["Tarot", "Planet"]) {
+  const at = localization.indexOf("\n        " + kind + "={");
+  if (at < 0) throw new Error(`${kind} localization block not found`);
+  const localized = braceBlock(localization, at);
+  const entries = new Map();
+  const entryRe = /(?:^|\n)\s*(c_[a-z0-9_]+)\s*=\s*\{/gi;
+  let entryMatch;
+  while ((entryMatch = entryRe.exec(localized))) {
+    const entry = braceBlock(localized, entryMatch.index + entryMatch[0].lastIndexOf("{"));
+    const name = entry.match(/\bname\s*=\s*"((?:\\.|[^"\\])*)"/);
+    if (name) entries.set(entryMatch[1], JSON.parse('"' + name[1] + '"'));
+  }
+  for (const line of game.split(/\r?\n/)) {
+    const center = line.match(/^\s*(c_[a-z0-9_]+)\s*=.*?\bname\s*=\s*["']([^"']+)["'].*?\bset\s*=\s*["'](Tarot|Planet)["']/i);
+    if (center && center[3] === kind) {
+      const cn = entries.get(center[1]);
+      if (!cn) throw new Error(`localization missing for ${center[2]}`);
+      consumableNames[center[2]] = cn;
+    }
+  }
+}
+
 const output = "/* Generated from Balatro 1.0.1o zh_CN localization. */\n" +
-  "window.SPECTRAL_CARDS=Object.freeze(" + JSON.stringify(cards, null, 2) + ");\n";
+  "window.SPECTRAL_CARDS=Object.freeze(" + JSON.stringify(cards, null, 2) + ");\n" +
+  "window.CONSUMABLE_NAMES=Object.freeze(" + JSON.stringify(consumableNames, null, 2) + ");\n";
 fs.writeFileSync(path.join(__dirname, "spectral-data.js"), output, "utf8");
 console.log(`generated ${cards.length} Spectral cards`);

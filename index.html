@@ -1747,6 +1747,7 @@ const jname=en=>(CN[en]||en);
 const SPECTRAL_DATA=window.SPECTRAL_CARDS||[];
 const SPECTRAL_BY_NAME=Object.fromEntries(SPECTRAL_DATA.map(c=>[c.en,c]));
 const spectralName=en=>(SPECTRAL_BY_NAME[en]&&SPECTRAL_BY_NAME[en].cn)||en;
+const consumableName=en=>window.CONSUMABLE_NAMES[en]||en;
 let spectralPickTarget=null,spectralPointer="mouse",spectralTouchArmed="";
 
 function positionTip(tip,card){
@@ -2418,7 +2419,7 @@ $("peek").onclick=()=>{
     for(const p of antePacks(run,a,_st,stickerMode)){
       const cs=p.cards.map(c=>{
         if(c.type==="spectral")return spectralName(c.name);
-        if(c.type!=="joker")return c.name||"?";
+        if(c.type!=="joker")return consumableName(c.name)||"?";
         if(c.soul){
           souls.push({ante:a,pack:packName(p.pack),joker:jname(c.name),edition:c.edition});
           return '<span class="soul-card">✦ 灵魂牌 → '+jname(c.name)+
